@@ -1,0 +1,28 @@
+# AstroSubam Production Apache Configuration
+DirectoryIndex index.html index.php
+
+# Security: Protect sensitive configuration files
+<FilesMatch "^\.env|\.git">
+    Require all denied
+</FilesMatch>
+
+# Proper MIME Types for Flutter Web & Wasm
+AddType application/wasm .wasm
+AddType application/javascript .js .mjs
+AddType application/json .json
+
+# Enable Compression for high performance
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json application/wasm
+</IfModule>
+
+# Browser Caching for Flutter Static Assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType application/wasm "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>

@@ -1,0 +1,12 @@
+# Environment & Credentials
+.env
+.env.local
+
+# Deployment Archives
+*.zip
+deploy_subam.zip
+
+# Build artifacts & OS files
+.DS_Store
+Thumbs.db
+*.log
