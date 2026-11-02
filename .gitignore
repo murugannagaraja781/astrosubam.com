@@ -10,3 +10,5 @@ deploy_subam.zip
 .DS_Store
 Thumbs.db
 *.log
+.kotlin/
+*.salive
