@@ -5,22 +5,42 @@ void main() {
   runApp(const AstroSubamApp());
 }
 
+// ==============================================================================
+// 🌟 ASTROTHEME - VEDIC EMERALD GREEN & SOLAR YELLOW DESIGN SYSTEM (UI/UX PRO MAX)
+// ==============================================================================
+class AstroTheme {
+  // Sacred Emerald Green Palette (Budha / Intellect / Growth / Peace)
+  static const Color emeraldNight = Color(0xFF041611); // Scaffold background
+  static const Color forestSurface = Color(0xFF08231B); // Glassmorphic cards
+  static const Color jadeContainer = Color(0xFF0C2D23); // Inner containers
+  static const Color headerGreen = Color(0xFF061E17); // AppBars & NavBars
+  static const Color borderGreen = Color(0xFF10392C); // Card borders
+  static const Color borderSubtle = Color(0xFF0E382B); // Subtle dividers
+
+  // Solar Yellow & Temple Gold Palette (Guru / Brihaspati / Prosperity / Wisdom)
+  static const Color solarYellow = Color(0xFFFACC15); // Primary solar gold/yellow
+  static const Color amberGold = Color(0xFFF59E0B); // Secondary turmeric amber
+  static const Color lightGold = Color(0xFFFEF08A); // Champagne gold
+  static const Color emeraldAccent = Color(0xFF10B981); // Sacred Basil / Emerald
+  static const Color textMint = Color(0xFFA7F3D0); // Soft mint text
+}
+
 class AstroSubamApp extends StatelessWidget {
   const AstroSubamApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AstroSubam - Astrology & Consultations',
+      title: 'AstroSubam - Vedic Astrology & Consultations',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF090A15),
-        primaryColor: const Color(0xFFFFD700),
+        scaffoldBackgroundColor: AstroTheme.emeraldNight,
+        primaryColor: AstroTheme.solarYellow,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFFD700),
-          secondary: Color(0xFFF39C12),
-          surface: Color(0xFF14172C),
+          primary: AstroTheme.solarYellow,
+          secondary: AstroTheme.emeraldAccent,
+          surface: AstroTheme.forestSurface,
         ),
         fontFamily: 'Roboto',
       ),
@@ -47,7 +67,7 @@ class UserState {
       'audioRate': 20.0,
       'videoRate': 35.0,
       'chatRate': 12.0,
-      'status': 'available', // available | busy
+      'status': 'available',
       'image': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
     },
     {
@@ -119,13 +139,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: _pages[_currentIndex],
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFF232742), width: 1)),
+          border: Border(top: BorderSide(color: AstroTheme.borderSubtle, width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          backgroundColor: const Color(0xFF101225),
-          selectedItemColor: const Color(0xFFFFD700),
-          unselectedItemColor: Colors.white54,
+          backgroundColor: AstroTheme.headerGreen,
+          selectedItemColor: AstroTheme.solarYellow,
+          unselectedItemColor: AstroTheme.textMint.withAlpha(140),
           type: BottomNavigationBarType.fixed,
           onTap: (index) => setState(() => _currentIndex = index),
           items: const [
@@ -148,7 +168,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF101225),
+        backgroundColor: AstroTheme.headerGreen,
         elevation: 0,
         title: Row(
           children: [
@@ -162,9 +182,9 @@ class HomeScreen extends StatelessWidget {
               children: const [
                 Text(
                   'ASTROSUBAM',
-                  style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2),
+                  style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2),
                 ),
-                Text('Auspicious Life Guidance', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                Text('Auspicious Life Guidance', style: TextStyle(color: AstroTheme.textMint, fontSize: 10)),
               ],
             ),
           ],
@@ -178,13 +198,13 @@ class HomeScreen extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1F2445),
+                color: AstroTheme.forestSurface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                border: Border.all(color: AstroTheme.solarYellow, width: 1),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.account_balance_wallet, color: Color(0xFFFFD700), size: 16),
+                  const Icon(Icons.account_balance_wallet, color: AstroTheme.solarYellow, size: 16),
                   const SizedBox(width: 6),
                   Text(
                     '₹${UserState.walletBalance.toStringAsFixed(0)}',
@@ -202,27 +222,27 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Banner
+              // Hero Banner (Emerald & Solar Gold Gradient)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF281E48), Color(0xFF131530)],
+                    colors: [Color(0xFF0A3326), Color(0xFF041A14)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFD700).withAlpha(77)),
+                  border: Border.all(color: AstroTheme.solarYellow.withAlpha(90)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.stars, color: Color(0xFFFFD700), size: 20),
+                        Icon(Icons.stars, color: AstroTheme.solarYellow, size: 20),
                         SizedBox(width: 8),
-                        Text('100% Authentic Vedic Consultation', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.w600, fontSize: 12)),
+                        Text('100% Authentic Vedic Consultation', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.w600, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -233,8 +253,8 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD700),
-                        foregroundColor: Colors.black,
+                        backgroundColor: AstroTheme.solarYellow,
+                        foregroundColor: AstroTheme.emeraldNight,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       ),
@@ -254,16 +274,16 @@ class HomeScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _quickAction(context, Icons.call, 'Live Call', const Color(0xFFE67E22), () {
+                  _quickAction(context, Icons.call, 'Live Call', AstroTheme.solarYellow, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AstrologersListScreen()));
                   }),
-                  _quickAction(context, Icons.videocam, 'Video Call', const Color(0xFF9B59B6), () {
+                  _quickAction(context, Icons.videocam, 'Video Call', AstroTheme.emeraldAccent, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AstrologersListScreen()));
                   }),
-                  _quickAction(context, Icons.chat, 'Live Chat', const Color(0xFF2ECC71), () {
+                  _quickAction(context, Icons.chat, 'Live Chat', const Color(0xFF34D399), () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AstrologersListScreen()));
                   }),
-                  _quickAction(context, Icons.calculate, 'Kundli', const Color(0xFF3498DB), () {
+                  _quickAction(context, Icons.calculate, 'Kundli', AstroTheme.amberGold, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const DailyKundliScreen()));
                   }),
                 ],
@@ -278,7 +298,7 @@ class HomeScreen extends StatelessWidget {
                   const Text('Available Astrologers', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   TextButton(
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AstrologersListScreen())),
-                    child: const Text('View All', style: TextStyle(color: Color(0xFFFFD700))),
+                    child: const Text('View All', style: TextStyle(color: AstroTheme.solarYellow)),
                   ),
                 ],
               ),
@@ -332,8 +352,8 @@ class AstrologersListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Top Astrologers', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF101225),
+        title: const Text('Top Astrologers', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        backgroundColor: AstroTheme.headerGreen,
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -362,9 +382,9 @@ class AstrologerCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14172C),
+        color: AstroTheme.forestSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF262A4E)),
+        border: Border.all(color: AstroTheme.borderGreen),
       ),
       child: Column(
         children: [
@@ -385,9 +405,9 @@ class AstrologerCard extends StatelessWidget {
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: AstroTheme.emeraldAccent,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF14172C), width: 2),
+                        border: Border.all(color: AstroTheme.forestSurface, width: 2),
                       ),
                     ),
                   ),
@@ -406,7 +426,7 @@ class AstrologerCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       astrologer['speciality'],
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      style: const TextStyle(color: AstroTheme.textMint, fontSize: 11),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -418,11 +438,11 @@ class AstrologerCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.star, color: Color(0xFFFFD700), size: 15),
+                        const Icon(Icons.star, color: AstroTheme.solarYellow, size: 15),
                         const SizedBox(width: 4),
                         Text(
                           '${astrologer['rating']} (${astrologer['reviews']} orders)',
-                          style: const TextStyle(color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -433,7 +453,7 @@ class AstrologerCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 12),
-          const Divider(color: Color(0xFF232742), height: 1),
+          const Divider(color: AstroTheme.borderSubtle, height: 1),
           const SizedBox(height: 10),
 
           // CTAs (Audio Call, Video Call, Chat)
@@ -442,8 +462,8 @@ class AstrologerCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2ECC71),
-                    side: const BorderSide(color: Color(0xFF2ECC71)),
+                    foregroundColor: AstroTheme.emeraldAccent,
+                    side: const BorderSide(color: AstroTheme.emeraldAccent),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -456,8 +476,8 @@ class AstrologerCard extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD700),
-                    foregroundColor: Colors.black,
+                    backgroundColor: AstroTheme.solarYellow,
+                    foregroundColor: AstroTheme.emeraldNight,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -481,8 +501,8 @@ class AstrologerCard extends StatelessWidget {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF14172C),
-          title: const Text('Insufficient Balance', style: TextStyle(color: Color(0xFFFFD700))),
+          backgroundColor: AstroTheme.forestSurface,
+          title: const Text('Insufficient Balance', style: TextStyle(color: AstroTheme.solarYellow)),
           content: Text(
             'Minimum 5 minutes balance (₹${minRequired.toStringAsFixed(0)}) is required to initiate consultation.\n\nYour current balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
             style: const TextStyle(color: Colors.white70),
@@ -493,7 +513,7 @@ class AstrologerCard extends StatelessWidget {
               child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
               onPressed: () {
                 Navigator.pop(ctx);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
@@ -563,12 +583,10 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
   }
 
   void _startTimers() {
-    // 1-second display timer
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       setState(() => _seconds++);
     });
 
-    // 60-second real-time wallet deduction heartbeat
     _billingTimer = Timer.periodic(const Duration(seconds: 60), (t) {
       if (UserState.walletBalance >= widget.ratePerMin) {
         setState(() {
@@ -578,16 +596,15 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF1F2445),
+            backgroundColor: AstroTheme.forestSurface,
             content: Text(
               '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-              style: const TextStyle(color: Color(0xFFFFD700)),
+              style: const TextStyle(color: AstroTheme.solarYellow),
             ),
             duration: const Duration(seconds: 2),
           ),
         );
       } else {
-        // Balance exhausted -> Auto-terminate call
         _endCall(exhausted: true);
       }
     });
@@ -601,8 +618,8 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14172C),
-        title: Text(exhausted ? 'Call Ended (Low Balance)' : 'Consultation Completed', style: const TextStyle(color: Color(0xFFFFD700))),
+        backgroundColor: AstroTheme.forestSurface,
+        title: Text(exhausted ? 'Call Ended (Low Balance)' : 'Consultation Completed', style: const TextStyle(color: AstroTheme.solarYellow)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -616,7 +633,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
         ),
         actions: [
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black),
+            style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.pop(context);
@@ -640,7 +657,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
     final String durationText = '${(_seconds ~/ 60).toString().padLeft(2, '0')}:${(_seconds % 60).toString().padLeft(2, '0')}';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A15),
+      backgroundColor: AstroTheme.emeraldNight,
       body: SafeArea(
         child: Column(
           children: [
@@ -652,13 +669,12 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'Agora RTC Live Consultation • $durationText',
-                  style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ],
             ),
             const Spacer(),
 
-            // Astrologer Avatar & Name
             CircleAvatar(
               radius: 65,
               backgroundImage: NetworkImage(widget.astrologer['image']),
@@ -671,32 +687,31 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
             const SizedBox(height: 6),
             Text(
               '₹${widget.ratePerMin.toStringAsFixed(0)} / min • Connected via Agora RTC',
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: const TextStyle(color: AstroTheme.textMint, fontSize: 13),
             ),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF14172C),
+                color: AstroTheme.forestSurface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFFD700).withAlpha(102)),
+                border: Border.all(color: AstroTheme.solarYellow.withAlpha(120)),
               ),
               child: Text(
                 'Wallet Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-                style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.w600, fontSize: 14),
+                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.w600, fontSize: 14),
               ),
             ),
 
             const Spacer(),
 
-            // Action Buttons (Mute, End Call, Speaker)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(
                   iconSize: 32,
                   icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF1F2445), padding: const EdgeInsets.all(14)),
+                  style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
                   onPressed: () => setState(() => _isMuted = !_isMuted),
                 ),
                 IconButton(
@@ -708,7 +723,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 IconButton(
                   iconSize: 32,
                   icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF1F2445), padding: const EdgeInsets.all(14)),
+                  style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
                   onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
                 ),
               ],
@@ -749,7 +764,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF101225),
+        backgroundColor: AstroTheme.headerGreen,
         title: Row(
           children: [
             CircleAvatar(radius: 18, backgroundImage: NetworkImage(widget.astrologer['image'])),
@@ -759,7 +774,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(widget.astrologer['name'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const Text('Online • Agora Chat', style: TextStyle(color: Colors.green, fontSize: 10)),
+                  const Text('Online • Agora Chat', style: TextStyle(color: AstroTheme.emeraldAccent, fontSize: 10)),
                 ],
               ),
             ),
@@ -774,19 +789,17 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
       ),
       body: Column(
         children: [
-          // Live Billing Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: const Color(0xFF14172C),
+            color: AstroTheme.forestSurface,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Rate: ₹${widget.ratePerMin.toInt()}/min', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                Text('Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 12)),
+                Text('Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 12)),
               ],
             ),
           ),
-          // Chat Messages
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -800,22 +813,21 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isUser ? const Color(0xFFFFD700) : const Color(0xFF1F2445),
+                      color: isUser ? AstroTheme.solarYellow : AstroTheme.jadeContainer,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Text(
                       msg['text']!,
-                      style: TextStyle(color: isUser ? Colors.black : Colors.white, fontSize: 14),
+                      style: TextStyle(color: isUser ? AstroTheme.emeraldNight : Colors.white, fontSize: 14),
                     ),
                   ),
                 );
               },
             ),
           ),
-          // Input bar
           Container(
             padding: const EdgeInsets.all(10),
-            color: const Color(0xFF101225),
+            color: AstroTheme.headerGreen,
             child: Row(
               children: [
                 Expanded(
@@ -826,7 +838,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                       hintText: 'Type your question or birth details...',
                       hintStyle: const TextStyle(color: Colors.white38),
                       filled: true,
-                      fillColor: const Color(0xFF1A1D36),
+                      fillColor: AstroTheme.forestSurface,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                     ),
@@ -834,7 +846,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: Colors.black),
+                  style: IconButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
                   icon: const Icon(Icons.send),
                   onPressed: () {
                     final text = _msgController.text.trim();
@@ -843,7 +855,6 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                         _messages.add({'sender': 'user', 'text': text});
                         _msgController.clear();
                       });
-                      // Auto simulate astrologer reply
                       Future.delayed(const Duration(seconds: 1), () {
                         if (mounted) {
                           setState(() {
@@ -871,8 +882,8 @@ class DailyKundliScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Today Rasipalan & Kundli', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF101225),
+        title: const Text('Today Rasipalan & Kundli', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        backgroundColor: AstroTheme.headerGreen,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -883,14 +894,14 @@ class DailyKundliScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF14172C),
+                color: AstroTheme.forestSurface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFFD700).withAlpha(77)),
+                border: Border.all(color: AstroTheme.solarYellow.withAlpha(80)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text('🌟 Today Auspicious Timings (Suba Neram)', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('🌟 Today Auspicious Timings (Suba Neram)', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 16)),
                   SizedBox(height: 10),
                   Text('• Nalla Neram: 09:15 AM - 10:15 AM', style: TextStyle(color: Colors.white70)),
                   Text('• Gowri Nalla Neram: 01:30 PM - 02:30 PM', style: TextStyle(color: Colors.white70)),
@@ -919,14 +930,14 @@ class DailyKundliScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF101225),
+        color: AstroTheme.headerGreen,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1F2445)),
+        border: Border.all(color: AstroTheme.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(rasi, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(rasi, style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 4),
           Text(forecast, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
@@ -953,7 +964,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: Colors.green,
+        backgroundColor: AstroTheme.emeraldAccent,
         content: Text('Recharge of ₹$amount Successful! New Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}'),
       ),
     );
@@ -963,8 +974,8 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Wallet', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF101225),
+        title: const Text('My Wallet', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        backgroundColor: AstroTheme.headerGreen,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -977,12 +988,12 @@ class _WalletScreenState extends State<WalletScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF281E48), Color(0xFF14172C)],
+                  colors: [Color(0xFF0A3326), Color(0xFF041A14)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFFD700).withAlpha(102)),
+                border: Border.all(color: AstroTheme.solarYellow.withAlpha(120)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,10 +1002,10 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '₹${UserState.walletBalance.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Color(0xFFFFD700), fontSize: 32, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 32, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  const Text('Valid for all Audio, Video, and Chat consultations', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  const Text('Valid for all Audio, Video, and Chat consultations', style: TextStyle(color: AstroTheme.textMint, fontSize: 11)),
                 ],
               ),
             ),
@@ -1010,9 +1021,9 @@ class _WalletScreenState extends State<WalletScreen> {
               children: _amounts.map((amt) {
                 return ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF14172C),
-                    foregroundColor: const Color(0xFFFFD700),
-                    side: const BorderSide(color: Color(0xFF2D325A)),
+                    backgroundColor: AstroTheme.forestSurface,
+                    foregroundColor: AstroTheme.solarYellow,
+                    side: const BorderSide(color: AstroTheme.borderGreen),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   ),
@@ -1026,8 +1037,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD700),
-                foregroundColor: Colors.black,
+                backgroundColor: AstroTheme.solarYellow,
+                foregroundColor: AstroTheme.emeraldNight,
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
               ),
