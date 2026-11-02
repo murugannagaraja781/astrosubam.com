@@ -2,22 +2,43 @@
 // database/install.php - One-click Database Setup & Seeder
 declare(strict_types=1);
 
-$host = getenv('DB_HOST') ?: '127.0.0.1';
-$port = getenv('DB_PORT') ?: '3306';
-$dbname = getenv('DB_NAME') ?: 'astrosubam';
-$user = getenv('DB_USER') ?: 'root';
-$pass = getenv('DB_PASS') ?: '';
+require_once __DIR__ . '/../helpers/Env.php';
+Env::load();
+
+$host = Env::get('DB_HOST', '127.0.0.1');
+$port = Env::get('DB_PORT', '3306');
+$dbname = Env::get('DB_NAME', 'astrosubam');
+$user = Env::get('DB_USER', 'root');
+$pass = Env::get('DB_PASS', '');
 
 header('Content-Type: text/html; charset=utf-8');
 
 try {
-    $pdo = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
+    $pdo = null;
+    $hostsToTry = array_unique([$host, 'localhost', '127.0.0.1']);
+    $lastException = null;
 
-    // Create DB
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
-    $pdo->exec("USE `{$dbname}`;");
+    foreach ($hostsToTry as $h) {
+        try {
+            $pdo = new PDO("mysql:host={$h};port={$port};dbname={$dbname};charset=utf8mb4", $user, $pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+            break;
+        } catch (PDOException $ex) {
+            $lastException = $ex;
+        }
+    }
+
+    if ($pdo === null) {
+        // Local XAMPP root fallback if on dev machine
+        try {
+            $pdo = new PDO("mysql:host=127.0.0.1;port=3306;dbname=astrosubam;charset=utf8mb4", 'root', '', [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+        } catch (PDOException $ex) {
+            throw $lastException ?? $ex;
+        }
+    }
 
     // Execute Schema
     $schema = file_get_contents(__DIR__ . '/schema.sql');

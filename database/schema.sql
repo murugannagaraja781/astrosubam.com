@@ -1,6 +1,5 @@
 -- AstroSubam Database Schema
-CREATE DATABASE IF NOT EXISTS `astrosubam` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `astrosubam`;
+-- Tables are created in the currently connected database
 
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS `users` (
