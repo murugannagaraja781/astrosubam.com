@@ -791,8 +791,22 @@ try {
                 <span id="call-type-title">Agora RTC Live Call</span> • <span id="call-timer">00:00</span>
             </div>
 
-            <!-- Astrologer Avatar -->
-            <div class="relative w-28 h-28 rounded-full overflow-hidden border-4 border-astro-gold shadow-glow-gold/50 mb-4">
+            <!-- Video Frame Container (when type === 'Video') -->
+            <div id="call-video-container" class="hidden relative w-full h-56 rounded-2xl overflow-hidden border-2 border-astro-gold shadow-glow-gold/40 mb-3 bg-black">
+                <img id="call-video-astro-img" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80" alt="Video Feed" class="w-full h-full object-cover">
+                <!-- PiP Self Camera -->
+                <div class="absolute top-2 right-2 w-20 h-28 rounded-xl overflow-hidden border-2 border-astro-emerald shadow-md bg-astro-surface flex flex-col items-center justify-center text-white">
+                    <i data-lucide="user" class="w-8 h-8 text-astro-gold"></i>
+                    <span class="text-[9px] text-astro-textMint font-bold mt-1">You (Self)</span>
+                </div>
+                <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-white flex items-center gap-1.5 backdrop-blur-sm">
+                    <span class="w-1.5 h-1.5 rounded-full bg-astro-emerald animate-pulse"></span>
+                    <span id="call-video-astro-name">Guruji S. Sundaramurthy</span>
+                </div>
+            </div>
+
+            <!-- Audio Avatar Container (when type === 'Audio') -->
+            <div id="call-audio-container" class="relative w-28 h-28 rounded-full overflow-hidden border-4 border-astro-gold shadow-glow-gold/50 mb-4 pulse-online">
                 <img id="call-astro-img" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80" alt="Astro" class="w-full h-full object-cover">
             </div>
 
@@ -811,17 +825,21 @@ try {
                 </div>
             </div>
 
-            <!-- Call Controls (Mute, End, Speaker) -->
-            <div class="flex items-center justify-center gap-6 mt-2">
-                <button onclick="toggleCallMute(this)" class="w-12 h-12 rounded-full bg-astro-surface border border-astro-emerald/40 text-white flex items-center justify-center hover:bg-astro-card">
+            <!-- Call Controls (Mute, Video Toggle, End, Speaker) -->
+            <div class="flex items-center justify-center gap-4 sm:gap-6 mt-2">
+                <button onclick="toggleCallMute(this)" id="btn-call-mic" title="Microphone Mute" class="w-12 h-12 rounded-full bg-astro-surface border border-astro-emerald/40 text-white flex items-center justify-center hover:bg-astro-card">
                     <i data-lucide="mic" class="w-5 h-5"></i>
                 </button>
 
-                <button onclick="endLiveCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg shadow-red-600/40 transform hover:scale-105 transition">
+                <button onclick="toggleVideoFeed(this)" id="btn-call-video" title="Video Camera Toggle" class="hidden w-12 h-12 rounded-full bg-astro-surface border border-astro-gold/40 text-astro-gold flex items-center justify-center hover:bg-astro-card">
+                    <i data-lucide="video" class="w-5 h-5"></i>
+                </button>
+
+                <button onclick="endLiveCall()" title="End Call" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg shadow-red-600/40 transform hover:scale-105 transition">
                     <i data-lucide="phone-off" class="w-7 h-7"></i>
                 </button>
 
-                <button onclick="toggleCallSpeaker(this)" class="w-12 h-12 rounded-full bg-astro-surface border border-astro-emerald/40 text-white flex items-center justify-center hover:bg-astro-card">
+                <button onclick="toggleCallSpeaker(this)" id="btn-call-speaker" title="Speaker" class="w-12 h-12 rounded-full bg-astro-surface border border-astro-emerald/40 text-white flex items-center justify-center hover:bg-astro-card">
                     <i data-lucide="volume-2" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -1052,6 +1070,18 @@ try {
             document.getElementById('call-rate-desc').innerText = `₹${rate} / நிமிடம் • Agora RTC Encrypted Channel`;
             document.getElementById('call-deducted-amt').innerText = '₹0.00';
             document.getElementById('call-timer').innerText = '00:00';
+
+            if (type === 'Video') {
+                document.getElementById('call-video-container').classList.remove('hidden');
+                document.getElementById('call-audio-container').classList.add('hidden');
+                document.getElementById('btn-call-video').classList.remove('hidden');
+                document.getElementById('call-video-astro-name').innerText = name;
+            } else {
+                document.getElementById('call-video-container').classList.add('hidden');
+                document.getElementById('call-audio-container').classList.remove('hidden');
+                document.getElementById('btn-call-video').classList.add('hidden');
+            }
+
             updateWalletUI();
 
             document.getElementById('call-modal').classList.remove('hidden');
@@ -1100,6 +1130,15 @@ try {
 
         function toggleCallSpeaker(btn) {
             btn.classList.toggle('text-astro-gold');
+        }
+
+        function toggleVideoFeed(btn) {
+            btn.classList.toggle('bg-red-500/30');
+            btn.classList.toggle('text-red-400');
+            const videoImg = document.getElementById('call-video-astro-img');
+            if (videoImg) {
+                videoImg.classList.toggle('opacity-30');
+            }
         }
 
         // ==============================================

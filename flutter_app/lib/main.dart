@@ -375,8 +375,9 @@ class AstrologerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double audioRate = astrologer['audioRate'];
-    final double chatRate = astrologer['chatRate'];
+    final double audioRate = (astrologer['audioRate'] as num?)?.toDouble() ?? 20.0;
+    final double videoRate = (astrologer['videoRate'] as num?)?.toDouble() ?? 30.0;
+    final double chatRate = (astrologer['chatRate'] as num?)?.toDouble() ?? 10.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -468,11 +469,11 @@ class AstrologerCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                   onPressed: () => _startConsultation(context, 'chat', chatRate),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                  label: Text('Chat ₹${chatRate.toInt()}/m', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                  label: Text('Chat ₹${chatRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -482,8 +483,23 @@ class AstrologerCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                   onPressed: () => _startConsultation(context, 'audio', audioRate),
-                  icon: const Icon(Icons.call, size: 16),
-                  label: Text('Call ₹${audioRate.toInt()}/m', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.call, size: 14),
+                  label: Text('Call ₹${audioRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AstroTheme.solarYellow,
+                    backgroundColor: AstroTheme.solarYellow.withAlpha(25),
+                    side: const BorderSide(color: AstroTheme.solarYellow),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () => _startConsultation(context, 'video', videoRate),
+                  icon: const Icon(Icons.videocam, size: 14),
+                  label: Text('Video ₹${videoRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -551,7 +567,7 @@ class AstrologerCard extends StatelessWidget {
   }
 }
 
-// 3. LIVE AGORA CALL SCREEN WITH 60-SEC HEARTBEAT BILLING
+// 3. LIVE AGORA CALL SCREEN (AUDIO & VIDEO WITH REAL-TIME BILLING HEARTBEAT)
 class LiveAgoraCallScreen extends StatefulWidget {
   final Map<String, dynamic> astrologer;
   final double ratePerMin;
@@ -574,6 +590,8 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
   Timer? _billingTimer;
   bool _isMuted = false;
   bool _isSpeaker = true;
+  bool _isCameraOff = false;
+  bool _isFrontCamera = true;
   double _totalDeducted = 0.0;
 
   @override
@@ -584,10 +602,11 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
 
   void _startTimers() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      setState(() => _seconds++);
+      if (mounted) setState(() => _seconds++);
     });
 
     _billingTimer = Timer.periodic(const Duration(seconds: 60), (t) {
+      if (!mounted) return;
       if (UserState.walletBalance >= widget.ratePerMin) {
         setState(() {
           UserState.walletBalance -= widget.ratePerMin;
@@ -598,8 +617,8 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
           SnackBar(
             backgroundColor: AstroTheme.forestSurface,
             content: Text(
-              '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-              style: const TextStyle(color: AstroTheme.solarYellow),
+              '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
+              style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
             ),
             duration: const Duration(seconds: 2),
           ),
@@ -624,6 +643,8 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('Type: ${widget.isVideo ? "Live Video Call" : "Voice Call"}', style: const TextStyle(color: AstroTheme.textMint, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
             Text('Duration: ${_seconds ~/ 60}m ${_seconds % 60}s', style: const TextStyle(color: Colors.white)),
             const SizedBox(height: 6),
             Text('Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white70)),
@@ -658,79 +679,338 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
 
     return Scaffold(
       backgroundColor: AstroTheme.emeraldNight,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      body: widget.isVideo ? _buildVideoCallUI(durationText) : _buildAudioCallUI(durationText),
+    );
+  }
+
+  // A. VIDEO CALL UI (FULL SCREEN AGORA CANVAS + PIP CAMERA + CONTROLS)
+  Widget _buildVideoCallUI(String durationText) {
+    return Stack(
+      children: [
+        // 1. Fullscreen Astrologer Video Canvas
+        Positioned.fill(
+          child: Container(
+            color: Colors.black,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                const Icon(Icons.fiber_manual_record, color: Colors.red, size: 12),
-                const SizedBox(width: 8),
-                Text(
-                  'Agora RTC Live Consultation • $durationText',
-                  style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 14),
+                Image.network(
+                  widget.astrologer['image'],
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => Container(
+                    color: AstroTheme.jadeContainer,
+                    child: const Center(child: Icon(Icons.person, size: 80, color: Colors.white54)),
+                  ),
+                ),
+                // Gradient Overlays
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withAlpha(180),
+                        Colors.transparent,
+                        Colors.black.withAlpha(220),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const Spacer(),
+          ),
+        ),
 
-            CircleAvatar(
-              radius: 65,
-              backgroundImage: NetworkImage(widget.astrologer['image']),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              widget.astrologer['name'],
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '₹${widget.ratePerMin.toStringAsFixed(0)} / min • Connected via Agora RTC',
-              style: const TextStyle(color: AstroTheme.textMint, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AstroTheme.forestSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AstroTheme.solarYellow.withAlpha(120)),
+        // 2. Astrologer Details & Voice Wave Overlay (Bottom Left)
+        Positioned(
+          left: 20,
+          bottom: 110,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AstroTheme.solarYellow.withAlpha(100)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.graphic_eq, color: AstroTheme.solarYellow, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.astrologer['name'],
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
-              child: Text(
-                'Wallet Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.w600, fontSize: 14),
+              const SizedBox(height: 4),
+              Text(
+                'Rate: ₹${widget.ratePerMin.toInt()}/m • Agora RTC 1080P Encrypted',
+                style: const TextStyle(color: AstroTheme.textMint, fontSize: 11),
               ),
+            ],
+          ),
+        ),
+
+        // 3. Floating Picture-in-Picture (PiP) Self Camera Preview (Top Right)
+        Positioned(
+          top: 50,
+          right: 16,
+          child: Container(
+            width: 100,
+            height: 140,
+            decoration: BoxDecoration(
+              color: AstroTheme.jadeContainer,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AstroTheme.solarYellow, width: 2),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withAlpha(150), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
             ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_isCameraOff)
+                  Container(
+                    color: Colors.black87,
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.videocam_off, color: Colors.white54, size: 24),
+                          SizedBox(height: 4),
+                          Text('Cam Off', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    color: Colors.grey.shade900,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person, color: AstroTheme.solarYellow.withAlpha(180), size: 36),
+                          const SizedBox(height: 4),
+                          Text(
+                            _isFrontCamera ? 'Front Cam' : 'Rear Cam',
+                            style: const TextStyle(color: AstroTheme.textMint, fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-            const Spacer(),
+                // Flip Camera Mini Button
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: InkWell(
+                    onTap: () => setState(() => _isFrontCamera = !_isFrontCamera),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
 
-            Row(
+        // 4. Top Header & Timer Bar
+        Positioned(
+          top: 45,
+          left: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.redAccent.withAlpha(140)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 12),
+                    const SizedBox(width: 6),
+                    Text(
+                      'LIVE VIDEO • $durationText',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AstroTheme.forestSurface.withAlpha(200),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'Bal: ₹${UserState.walletBalance.toStringAsFixed(0)} (Billed: ₹${_totalDeducted.toStringAsFixed(0)})',
+                  style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 5. Video Call Controls Bar (Bottom)
+        Positioned(
+          bottom: 25,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: AstroTheme.forestSurface.withAlpha(220),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: AstroTheme.borderGreen),
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                // Toggle Mic
                 IconButton(
-                  iconSize: 32,
-                  icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
+                  iconSize: 26,
+                  icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.redAccent : Colors.white),
                   onPressed: () => setState(() => _isMuted = !_isMuted),
                 ),
+                // Toggle Video / Camera
                 IconButton(
-                  iconSize: 38,
-                  icon: const Icon(Icons.call_end, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(18)),
-                  onPressed: () => _endCall(),
+                  iconSize: 26,
+                  icon: Icon(_isCameraOff ? Icons.videocam_off : Icons.videocam, color: _isCameraOff ? Colors.redAccent : Colors.white),
+                  onPressed: () => setState(() => _isCameraOff = !_isCameraOff),
                 ),
+                // End Call Button
                 IconButton(
                   iconSize: 32,
-                  icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
+                  icon: const Icon(Icons.call_end, color: Colors.white),
+                  style: IconButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(12)),
+                  onPressed: () => _endCall(),
+                ),
+                // Flip Camera
+                IconButton(
+                  iconSize: 26,
+                  icon: const Icon(Icons.flip_camera_android, color: Colors.white),
+                  onPressed: () => setState(() => _isFrontCamera = !_isFrontCamera),
+                ),
+                // Toggle Speaker
+                IconButton(
+                  iconSize: 26,
+                  icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: AstroTheme.solarYellow),
                   onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
                 ),
               ],
             ),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+
+  // B. AUDIO CALL UI (SACRED VEDIC AURA + PULSING AVATAR + CONTROLS)
+  Widget _buildAudioCallUI(String durationText) {
+    return SafeArea(
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.fiber_manual_record, color: Colors.red, size: 12),
+              const SizedBox(width: 8),
+              Text(
+                'Agora RTC Voice Call • $durationText',
+                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ),
+          const Spacer(),
+
+          // Sacred Pulsing Avatar
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AstroTheme.solarYellow.withAlpha(80), width: 2),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AstroTheme.emeraldAccent.withAlpha(120), width: 3),
+              ),
+              child: CircleAvatar(
+                radius: 65,
+                backgroundImage: NetworkImage(widget.astrologer['image']),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            widget.astrologer['name'],
+            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '₹${widget.ratePerMin.toStringAsFixed(0)} / min • Connected via Agora RTC',
+            style: const TextStyle(color: AstroTheme.textMint, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AstroTheme.forestSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AstroTheme.solarYellow.withAlpha(120)),
+            ),
+            child: Text(
+              'Wallet Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
+              style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ),
+
+          const Spacer(),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                iconSize: 32,
+                icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.redAccent : Colors.white),
+                style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
+                onPressed: () => setState(() => _isMuted = !_isMuted),
+              ),
+              IconButton(
+                iconSize: 38,
+                icon: const Icon(Icons.call_end, color: Colors.white),
+                style: IconButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(18)),
+                onPressed: () => _endCall(),
+              ),
+              IconButton(
+                iconSize: 32,
+                icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: Colors.white),
+                style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
+                onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+              ),
+            ],
+          ),
+          const SizedBox(height: 40),
+        ],
       ),
     );
   }

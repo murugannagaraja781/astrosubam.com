@@ -1,6 +1,7 @@
 # Environment & Credentials
 .env
 .env.local
+.env.bak
 
 # Deployment Archives
 *.zip

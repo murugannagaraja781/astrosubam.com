@@ -215,6 +215,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recharge_user_wallet'
     }
 }
 
+$envFilePath = dirname(__DIR__) . '/.env';
+$envBakPath = dirname(__DIR__) . '/.env.bak';
+
+// 5. Action: Save .env Visual Form
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_env_visual'])) {
+    $dbHost = trim($_POST['DB_HOST'] ?? '127.0.0.1');
+    $dbPort = trim($_POST['DB_PORT'] ?? '3306');
+    $dbName = trim($_POST['DB_NAME'] ?? '');
+    $dbUser = trim($_POST['DB_USER'] ?? '');
+    $dbPass = trim($_POST['DB_PASS'] ?? '');
+
+    $agoraAppId = trim($_POST['AGORA_APP_ID'] ?? '');
+    $agoraAppCert = trim($_POST['AGORA_APP_CERTIFICATE'] ?? '');
+    $agoraExpire = trim($_POST['AGORA_TOKEN_EXPIRE_SECONDS'] ?? '3600');
+    $agoraPrefix = trim($_POST['AGORA_CHANNEL_PREFIX'] ?? 'astrosubam_');
+
+    $smsApiKey = trim($_POST['PING4SMS_API_KEY'] ?? '');
+    $smsSender = trim($_POST['PING4SMS_SENDER_ID'] ?? 'ASTELV');
+    $smsRoute = trim($_POST['PING4SMS_ROUTE'] ?? '4');
+    $smsTemplate = trim($_POST['PING4SMS_TEMPLATE_ID'] ?? '');
+
+    $jwtSecret = trim($_POST['JWT_SECRET'] ?? 'astrosubam_super_secure_divine_secret_key_2026');
+
+    $newEnvContent = "# ==============================================\n" .
+        "# ASTROSUBAM ENVIRONMENT CONFIGURATION\n" .
+        "# Updated via Super Admin Dashboard: " . date('Y-m-d H:i:s') . "\n" .
+        "# ==============================================\n\n" .
+        "# Database Settings\n" .
+        "DB_HOST={$dbHost}\n" .
+        "DB_PORT={$dbPort}\n" .
+        "DB_NAME={$dbName}\n" .
+        "DB_USER={$dbUser}\n" .
+        "DB_PASS={$dbPass}\n\n" .
+        "# Agora RTC & Voice/Video Call Settings\n" .
+        "AGORA_APP_ID={$agoraAppId}\n" .
+        "AGORA_APP_CERTIFICATE={$agoraAppCert}\n" .
+        "AGORA_TOKEN_EXPIRE_SECONDS={$agoraExpire}\n" .
+        "AGORA_CHANNEL_PREFIX={$agoraPrefix}\n\n" .
+        "# SMS Gateway Settings (Ping4SMS)\n" .
+        "PING4SMS_API_KEY={$smsApiKey}\n" .
+        "PING4SMS_SENDER_ID={$smsSender}\n" .
+        "PING4SMS_ROUTE={$smsRoute}\n" .
+        "PING4SMS_TEMPLATE_ID={$smsTemplate}\n\n" .
+        "# Security & Tokens\n" .
+        "JWT_SECRET={$jwtSecret}\n";
+
+    if (file_exists($envFilePath)) {
+        @copy($envFilePath, $envBakPath);
+    }
+
+    if (@file_put_contents($envFilePath, $newEnvContent) !== false) {
+        if (!empty($agoraAppId)) Settings::set('agora_app_id', $agoraAppId, 'Agora RTC App ID');
+        if (!empty($agoraAppCert)) Settings::set('agora_app_certificate', $agoraAppCert, 'Agora Certificate');
+        Settings::set('agora_token_expire_seconds', $agoraExpire, 'Token Expiry');
+        Settings::set('agora_channel_prefix', $agoraPrefix, 'Channel Prefix');
+        if (!empty($smsApiKey)) Settings::set('ping4sms_api_key', $smsApiKey, 'Ping4SMS API Key');
+        if (!empty($smsSender)) Settings::set('ping4sms_sender_id', $smsSender, 'Ping4SMS Sender ID');
+        if (!empty($smsTemplate)) Settings::set('ping4sms_template_id', $smsTemplate, 'Ping4SMS Template ID');
+
+        $toastMessage = '✅ .env கோப்பு மற்றும் சிஸ்டம் அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன! (.env.bak காப்புப் பிரதி எடுக்கப்பட்டது)';
+    } else {
+        $toastMessage = '❌ .env கோப்பை எழுத அனுமதி இல்லை (Permission Denied). சர்வர் அனுமதியை சரிபார்க்கவும்.';
+        $toastType = 'error';
+    }
+}
+
+// 6. Action: Save .env Raw Textarea
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_env_raw'])) {
+    $rawEnv = $_POST['raw_env_content'] ?? '';
+
+    if (file_exists($envFilePath)) {
+        @copy($envFilePath, $envBakPath);
+    }
+
+    if (@file_put_contents($envFilePath, $rawEnv) !== false) {
+        $toastMessage = '✅ .env மூலக் கோப்பு (Raw file) வெற்றிகரமாக சேமிக்கப்பட்டது! (.env.bak காப்புப் பிரதி எடுக்கப்பட்டது)';
+    } else {
+        $toastMessage = '❌ .env கோப்பை எழுத முடியவில்லை.';
+        $toastType = 'error';
+    }
+}
+
+// 7. Action: Restore .env from Backup
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_env_bak'])) {
+    if (file_exists($envBakPath)) {
+        if (@copy($envBakPath, $envFilePath)) {
+            $toastMessage = '✅ .env.bak காப்புப் பிரதியிலிருந்து முந்தைய அமைப்புகள் மீட்டெடுக்கப்பட்டன!';
+        } else {
+            $toastMessage = '❌ காப்புப் பிரதியை மீட்டெடுக்க முடியவில்லை.';
+            $toastType = 'error';
+        }
+    } else {
+        $toastMessage = '❌ .env.bak காப்புப் பிரதி கோப்பு எதுவும் காணப்படவில்லை.';
+        $toastType = 'error';
+    }
+}
+
 // Data Queries for Dashboard
 $totalUsers = (int)$db->query("SELECT COUNT(*) FROM users")->fetchColumn();
 $totalAstrologers = (int)$db->query("SELECT COUNT(*) FROM astrologers")->fetchColumn();
@@ -238,6 +335,26 @@ $agoraAppId = Settings::get('agora_app_id', '');
 $agoraAppCert = Settings::get('agora_app_certificate', '');
 $agoraExpire = Settings::get('agora_token_expire_seconds', '3600');
 $agoraPrefix = Settings::get('agora_channel_prefix', 'astrosubam_');
+
+// .env File Parser for Visual Editor
+$envRaw = file_exists($envFilePath) ? (string)file_get_contents($envFilePath) : '';
+$envWritable = is_writable(file_exists($envFilePath) ? $envFilePath : dirname($envFilePath));
+$envLastModified = file_exists($envFilePath) ? date('d M Y, h:i A', (int)filemtime($envFilePath)) : 'Not Found';
+$hasBackup = file_exists($envBakPath);
+$bakLastModified = $hasBackup ? date('d M Y, h:i A', (int)filemtime($envBakPath)) : 'None';
+
+$envVars = [];
+if (!empty($envRaw)) {
+    $lines = explode("\n", $envRaw);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) continue;
+        $parts = explode('=', $line, 2);
+        if (count($parts) === 2) {
+            $envVars[trim($parts[0])] = trim($parts[1]);
+        }
+    }
+}
 
 $activeTab = $_GET['tab'] ?? 'overview';
 ?>
@@ -334,6 +451,9 @@ $activeTab = $_GET['tab'] ?? 'overview';
             <a href="?tab=agora" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'agora' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
                 <i data-lucide="settings" class="w-4 h-4"></i> Agora & System Config
             </a>
+            <a href="?tab=env" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'env' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
+                <i data-lucide="file-code" class="w-4 h-4"></i> .env File Editor
+            </a>
         </nav>
 
         <!-- Sidebar Footer -->
@@ -360,6 +480,7 @@ $activeTab = $_GET['tab'] ?? 'overview';
                     elseif ($activeTab === 'consultations') echo '📞 நேரலை ஆலோசனைகள் வரலாறு (Consultation Log)';
                     elseif ($activeTab === 'wallet') echo '💰 வாலட் பரிவர்த்தனைகள் (Wallet & Ledger)';
                     elseif ($activeTab === 'agora') echo '⚙️ Agora RTC & சிஸ்டம் அமைப்புகள்';
+                    elseif ($activeTab === 'env') echo '📝 .env கோப்பு கட்டமைப்பு & திருத்தி (.env Editor)';
                     ?>
                 </h2>
             </div>
@@ -723,6 +844,248 @@ $activeTab = $_GET['tab'] ?? 'overview';
                     </button>
                 </form>
             </div>
+            <?php endif; ?>
+
+            <!-- ============================================== -->
+            <!-- TAB 6: .ENV FILE VISUAL & RAW EDITOR -->
+            <!-- ============================================== -->
+            <?php if ($activeTab === 'env'): ?>
+            <div class="max-w-4xl mx-auto space-y-6">
+
+                <!-- File Status Bar -->
+                <div class="glass-card p-5 rounded-3xl border border-astro-gold/30 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-astro-gold/20 flex items-center justify-center text-astro-gold border border-astro-gold/40 flex-shrink-0">
+                            <i data-lucide="file-code" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-cinzel text-base font-bold text-white flex items-center gap-2">
+                                .env Configuration File
+                                <?php if ($envWritable): ?>
+                                <span class="bg-astro-emerald/20 text-astro-emerald text-[10px] font-bold px-2 py-0.5 rounded-full border border-astro-emerald/40 flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-astro-emerald"></span> Writable
+                                </span>
+                                <?php else: ?>
+                                <span class="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/40">
+                                    Read Only
+                                </span>
+                                <?php endif; ?>
+                            </h3>
+                            <p class="text-xs text-white/50 font-mono mt-0.5"><?= htmlspecialchars($envFilePath) ?></p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-[11px] text-white/70">
+                        <span class="px-2.5 py-1 rounded-xl bg-astro-surface border border-astro-border">
+                            கடைசியாக திருத்தப்பட்டது: <b class="text-astro-gold"><?= $envLastModified ?></b>
+                        </span>
+                        <?php if ($hasBackup): ?>
+                        <span class="px-2.5 py-1 rounded-xl bg-astro-surface border border-astro-emerald/40 text-astro-textMint">
+                            🛡️ Backup Active: <?= $bakLastModified ?>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Mode Switcher Tabs -->
+                <div class="flex items-center gap-2 border-b border-astro-border pb-2">
+                    <button id="btn-env-mode-visual" onclick="switchEnvMode('visual')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-astro-gold text-astro-base flex items-center gap-2 shadow-sm">
+                        <i data-lucide="sliders" class="w-3.5 h-3.5"></i> படிவ முறை (Smart Visual Form)
+                    </button>
+                    <button id="btn-env-mode-raw" onclick="switchEnvMode('raw')" class="px-4 py-2 rounded-xl text-xs font-bold transition text-white/70 hover:bg-astro-surface hover:text-white flex items-center gap-2">
+                        <i data-lucide="code" class="w-3.5 h-3.5"></i> மூலக் குறியீடு (Raw Editor)
+                    </button>
+                </div>
+
+                <!-- MODE A: SMART VISUAL FORM -->
+                <div id="env-mode-visual" class="space-y-6">
+                    <form method="POST" action="index.php?tab=env" class="space-y-6">
+
+                        <!-- 1. Database Settings Card -->
+                        <div class="glass-card p-6 rounded-3xl border border-astro-border space-y-4">
+                            <div class="flex items-center gap-2 text-astro-gold border-b border-astro-border pb-3">
+                                <i data-lucide="database" class="w-5 h-5"></i>
+                                <h4 class="font-cinzel font-bold text-sm text-white">1. MySQL தரவுத்தள அமைப்புகள் (Database Config)</h4>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                                <div>
+                                    <label class="block text-white/70 mb-1">DB_HOST</label>
+                                    <input type="text" name="DB_HOST" value="<?= htmlspecialchars($envVars['DB_HOST'] ?? '127.0.0.1') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-white/70 mb-1">DB_PORT</label>
+                                    <input type="text" name="DB_PORT" value="<?= htmlspecialchars($envVars['DB_PORT'] ?? '3306') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-white/70 mb-1">DB_NAME</label>
+                                    <input type="text" name="DB_NAME" value="<?= htmlspecialchars($envVars['DB_NAME'] ?? 'u170490412_subamadmin') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-white/70 mb-1">DB_USER</label>
+                                    <input type="text" name="DB_USER" value="<?= htmlspecialchars($envVars['DB_USER'] ?? 'u170490412_subamastro') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-white/70 mb-1">DB_PASS</label>
+                                    <div class="relative">
+                                        <input type="password" id="input_db_pass" name="DB_PASS" value="<?= htmlspecialchars($envVars['DB_PASS'] ?? 'aGreen@2026a') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 pr-10 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                        <button type="button" onclick="togglePass('input_db_pass')" class="absolute right-3 top-2.5 text-white/40 hover:text-white">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Agora RTC Engine Card -->
+                        <div class="glass-card p-6 rounded-3xl border border-astro-border space-y-4">
+                            <div class="flex items-center gap-2 text-astro-gold border-b border-astro-border pb-3">
+                                <i data-lucide="video" class="w-5 h-5"></i>
+                                <h4 class="font-cinzel font-bold text-sm text-white">2. Agora RTC அழைப்பு அமைப்புகள் (Call, Video & Chat Engine)</h4>
+                            </div>
+                            <div class="space-y-3 text-xs">
+                                <div>
+                                    <label class="block text-white/70 mb-1">AGORA_APP_ID (32-character Hexadecimal ID)</label>
+                                    <input type="text" name="AGORA_APP_ID" value="<?= htmlspecialchars($envVars['AGORA_APP_ID'] ?? '8c0ca8c1b8bc403d814f8f86653e07c3') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-white/70 mb-1">AGORA_APP_CERTIFICATE (Primary Certificate for RTC Tokens)</label>
+                                    <div class="relative">
+                                        <input type="password" id="input_agora_cert" name="AGORA_APP_CERTIFICATE" value="<?= htmlspecialchars($envVars['AGORA_APP_CERTIFICATE'] ?? 'f42df2eb1af44ac0a3394ab2af3dd5ed') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 pr-10 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                        <button type="button" onclick="togglePass('input_agora_cert')" class="absolute right-3 top-2.5 text-white/40 hover:text-white">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-white/70 mb-1">AGORA_TOKEN_EXPIRE_SECONDS</label>
+                                        <input type="number" name="AGORA_TOKEN_EXPIRE_SECONDS" value="<?= htmlspecialchars($envVars['AGORA_TOKEN_EXPIRE_SECONDS'] ?? '3600') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:border-astro-gold focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-white/70 mb-1">AGORA_CHANNEL_PREFIX</label>
+                                        <input type="text" name="AGORA_CHANNEL_PREFIX" value="<?= htmlspecialchars($envVars['AGORA_CHANNEL_PREFIX'] ?? 'astrosubam_') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:border-astro-gold focus:outline-none">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. SMS Gateway (Ping4SMS) Card -->
+                        <div class="glass-card p-6 rounded-3xl border border-astro-border space-y-4">
+                            <div class="flex items-center gap-2 text-astro-gold border-b border-astro-border pb-3">
+                                <i data-lucide="message-square" class="w-5 h-5"></i>
+                                <h4 class="font-cinzel font-bold text-sm text-white">3. SMS Gateway அமைப்புகள் (Ping4SMS DLT OTP)</h4>
+                            </div>
+                            <div class="space-y-3 text-xs">
+                                <div>
+                                    <label class="block text-white/70 mb-1">PING4SMS_API_KEY</label>
+                                    <input type="text" name="PING4SMS_API_KEY" value="<?= htmlspecialchars($envVars['PING4SMS_API_KEY'] ?? 'e1fc54301c0da93b95d3502a3151f420') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-white/70 mb-1">PING4SMS_SENDER_ID</label>
+                                        <input type="text" name="PING4SMS_SENDER_ID" value="<?= htmlspecialchars($envVars['PING4SMS_SENDER_ID'] ?? 'ASTELV') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-white/70 mb-1">PING4SMS_ROUTE</label>
+                                        <input type="text" name="PING4SMS_ROUTE" value="<?= htmlspecialchars($envVars['PING4SMS_ROUTE'] ?? '4') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-white/70 mb-1">PING4SMS_TEMPLATE_ID</label>
+                                        <input type="text" name="PING4SMS_TEMPLATE_ID" value="<?= htmlspecialchars($envVars['PING4SMS_TEMPLATE_ID'] ?? '1677100000000387344') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                    </div>
+                                </div>
+                                <div class="p-3 rounded-xl bg-astro-surface border border-astro-emerald/30 text-[11px] text-astro-textMint">
+                                    📱 <b>DLT Bypass Guard:</b> சோதனை கணக்குகளுக்கான மொபைல் எண்கள் (<code>8000000001</code>, <code>9000000001</code>, <code>8000000000</code>, <code>9000000000</code>) நிலையான OTP <code>0101</code> மூலம் உடனடியாக உள்நுழைய தானியங்கியாக அனுமதிக்கப்பட்டுள்ளன.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Security & JWT Card -->
+                        <div class="glass-card p-6 rounded-3xl border border-astro-border space-y-4">
+                            <div class="flex items-center gap-2 text-astro-gold border-b border-astro-border pb-3">
+                                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                                <h4 class="font-cinzel font-bold text-sm text-white">4. பாதுகாப்பு & JWT இரகசிய சாவி (Security & Secret Key)</h4>
+                            </div>
+                            <div class="text-xs">
+                                <label class="block text-white/70 mb-1">JWT_SECRET (Used to sign authentication tokens)</label>
+                                <input type="text" name="JWT_SECRET" value="<?= htmlspecialchars($envVars['JWT_SECRET'] ?? 'astrosubam_super_secure_divine_secret_key_2026') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                            </div>
+                        </div>
+
+                        <button type="submit" name="save_env_visual" class="btn-gold w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-astro-gold/20">
+                            <i data-lucide="save" class="w-5 h-5"></i> படிவ மாறிகளை .env கோப்பில் சேமிக்க (Save All to .env)
+                        </button>
+                    </form>
+                </div>
+
+                <!-- MODE B: RAW CODE EDITOR -->
+                <div id="env-mode-raw" class="hidden space-y-4">
+                    <form method="POST" action="index.php?tab=env" class="space-y-4">
+                        <div class="glass-card p-4 rounded-3xl border border-astro-border">
+                            <div class="flex items-center justify-between text-xs text-white/60 mb-2 px-1">
+                                <span>.env Direct Text Stream (UTF-8)</span>
+                                <span>தானியங்கி .env.bak காப்புப் பிரதி செயல்படுத்தப்படும்</span>
+                            </div>
+                            <textarea name="raw_env_content" rows="18" class="w-full bg-astro-base border border-astro-border rounded-2xl p-4 text-xs text-white font-mono leading-relaxed focus:border-astro-gold focus:outline-none selection:bg-astro-gold selection:text-astro-base" spellcheck="false"><?= htmlspecialchars($envRaw) ?></textarea>
+                        </div>
+
+                        <button type="submit" name="save_env_raw" class="btn-gold w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-astro-gold/20">
+                            <i data-lucide="file-check" class="w-5 h-5"></i> மூல .env கோப்பை நேரடியாகச் சேமிக்க (Save Raw .env File)
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Backup & Rollback Card -->
+                <?php if ($hasBackup): ?>
+                <div class="p-5 rounded-3xl bg-astro-surface border border-astro-emerald/30 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="rotate-ccw" class="w-6 h-6 text-astro-gold flex-shrink-0"></i>
+                        <div>
+                            <h5 class="text-xs font-bold text-white">காப்புப் பிரதியை மீட்டெடுக்கவும் (.env.bak Rollback)</h5>
+                            <p class="text-[11px] text-white/50">முந்தைய வேலை செய்யும் நிலைக்கு .env கோப்பை மீட்டமைக்கலாம் (காப்பு தேதி: <?= $bakLastModified ?>)</p>
+                        </div>
+                    </div>
+                    <form method="POST" action="index.php?tab=env" onsubmit="return confirm('நிச்சயமாக முந்தைய .env.bak காப்புப் பிரதியை மீட்டெடுக்க விரும்புகிறீர்களா?');">
+                        <button type="submit" name="restore_env_bak" class="px-4 py-2 rounded-xl bg-astro-card border border-astro-emerald/40 text-astro-textMint hover:bg-astro-surface text-xs font-bold transition flex items-center gap-1.5">
+                            <i data-lucide="undo-2" class="w-3.5 h-3.5"></i> Restore Backup
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+            </div>
+
+            <script>
+                function switchEnvMode(mode) {
+                    const visualDiv = document.getElementById('env-mode-visual');
+                    const rawDiv = document.getElementById('env-mode-raw');
+                    const btnVisual = document.getElementById('btn-env-mode-visual');
+                    const btnRaw = document.getElementById('btn-env-mode-raw');
+
+                    if (mode === 'visual') {
+                        visualDiv.classList.remove('hidden');
+                        rawDiv.classList.add('hidden');
+                        btnVisual.classList.add('bg-astro-gold', 'text-astro-base');
+                        btnVisual.classList.remove('text-white/70');
+                        btnRaw.classList.remove('bg-astro-gold', 'text-astro-base');
+                        btnRaw.classList.add('text-white/70');
+                    } else {
+                        visualDiv.classList.add('hidden');
+                        rawDiv.classList.remove('hidden');
+                        btnRaw.classList.add('bg-astro-gold', 'text-astro-base');
+                        btnRaw.classList.remove('text-white/70');
+                        btnVisual.classList.remove('bg-astro-gold', 'text-astro-base');
+                        btnVisual.classList.add('text-white/70');
+                    }
+                }
+
+                function togglePass(id) {
+                    const elem = document.getElementById(id);
+                    if (elem) {
+                        elem.type = elem.type === 'password' ? 'text' : 'password';
+                    }
+                }
+            </script>
             <?php endif; ?>
 
         </main>

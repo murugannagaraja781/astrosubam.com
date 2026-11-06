@@ -59,14 +59,7 @@ try {
 function getDb(): PDO {
     global $pdo, $dbError;
     if ($pdo === null) {
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => false,
-            'message' => 'Database connection failed. Please run database/install.php first to initialize MySQL.',
-            'error'   => $dbError ?? 'Unknown error'
-        ]);
-        exit;
+        throw new RuntimeException("Database connection failed. " . ($dbError ?? 'Please verify database settings.'));
     }
     return $pdo;
 }
