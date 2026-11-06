@@ -8,6 +8,7 @@
 deploy_subam.zip
 
 # Build artifacts & OS files
+*.apk
 .DS_Store
 Thumbs.db
 *.log

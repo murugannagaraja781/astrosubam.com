@@ -80,3 +80,4 @@ Response::json(true, $isNew ? 'Account created! ₹100 Welcome Bonus credited to
     'token'   => $token,
     'is_new'  => $isNew
 ]);
+

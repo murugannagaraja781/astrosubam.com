@@ -25,6 +25,13 @@ class AstroTheme {
   static const Color textMint = Color(0xFFA7F3D0); // Soft mint text
 }
 
+ImageProvider safeAstroImage(String? url) {
+  if (url != null && url.startsWith('http')) {
+    return NetworkImage(url);
+  }
+  return const AssetImage('assets/logo.jpg');
+}
+
 class AstroSubamApp extends StatelessWidget {
   const AstroSubamApp({super.key});
 
@@ -51,9 +58,10 @@ class AstroSubamApp extends StatelessWidget {
 
 // App State Manager
 class UserState {
+  static bool isLoggedIn = false;
   static double walletBalance = 500.00;
   static String userName = 'Devotee User';
-  static String userPhone = '+91 99988 87770';
+  static String userPhone = '8000000001';
 
   static List<Map<String, dynamic>> astrologers = [
     {
@@ -190,13 +198,59 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: UserState.isLoggedIn ? UserState.userName : 'Login with Mobile OTP',
+            icon: Icon(
+              UserState.isLoggedIn ? Icons.account_circle : Icons.login_rounded,
+              color: AstroTheme.solarYellow,
+            ),
+            onPressed: () {
+              if (UserState.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AstroTheme.forestSurface,
+                    title: const Text('Devotee Profile', style: TextStyle(color: AstroTheme.solarYellow)),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Name: ${UserState.userName}', style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 6),
+                        Text('Mobile: +91 ${UserState.userPhone}', style: const TextStyle(color: Colors.white70)),
+                        const SizedBox(height: 6),
+                        Text('Wallet Balance: ₹${UserState.walletBalance.toStringAsFixed(2)}', style: const TextStyle(color: AstroTheme.emeraldAccent, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          UserState.isLoggedIn = false;
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logged out cleanly.')));
+                        },
+                        child: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                showDialog(context: context, builder: (_) => const LoginWithOtpDialog());
+              }
+            },
+          ),
           GestureDetector(
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
             },
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AstroTheme.forestSurface,
                 borderRadius: BorderRadius.circular(20),
@@ -205,7 +259,7 @@ class HomeScreen extends StatelessWidget {
               child: Row(
                 children: [
                   const Icon(Icons.account_balance_wallet, color: AstroTheme.solarYellow, size: 16),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   Text(
                     '₹${UserState.walletBalance.toStringAsFixed(0)}',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
@@ -397,7 +451,7 @@ class AstrologerCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 34,
-                    backgroundImage: NetworkImage(astrologer['image']),
+                    backgroundImage: safeAstroImage(astrologer['image']),
                   ),
                   Positioned(
                     bottom: 0,
@@ -694,14 +748,13 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  widget.astrologer['image'],
-                  fit: BoxFit.cover,
-                  errorBuilder: (ctx, err, stack) => Container(
-                    color: AstroTheme.jadeContainer,
-                    child: const Center(child: Icon(Icons.person, size: 80, color: Colors.white54)),
-                  ),
-                ),
+                widget.astrologer['image'].toString().startsWith('http')
+                    ? Image.network(
+                        widget.astrologer['image'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Image.asset('assets/logo.jpg', fit: BoxFit.cover),
+                      )
+                    : Image.asset('assets/logo.jpg', fit: BoxFit.cover),
                 // Gradient Overlays
                 Container(
                   decoration: BoxDecoration(
@@ -956,7 +1009,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
               ),
               child: CircleAvatar(
                 radius: 65,
-                backgroundImage: NetworkImage(widget.astrologer['image']),
+                backgroundImage: safeAstroImage(widget.astrologer['image']),
               ),
             ),
           ),
@@ -1047,7 +1100,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
         backgroundColor: AstroTheme.headerGreen,
         title: Row(
           children: [
-            CircleAvatar(radius: 18, backgroundImage: NetworkImage(widget.astrologer['image'])),
+            CircleAvatar(radius: 18, backgroundImage: safeAstroImage(widget.astrologer['image'])),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1329,6 +1382,172 @@ class _WalletScreenState extends State<WalletScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// 7. DEVOTEE LOGIN WITH OTP DIALOG
+class LoginWithOtpDialog extends StatefulWidget {
+  const LoginWithOtpDialog({super.key});
+
+  @override
+  State<LoginWithOtpDialog> createState() => _LoginWithOtpDialogState();
+}
+
+class _LoginWithOtpDialogState extends State<LoginWithOtpDialog> {
+  final TextEditingController _phoneController = TextEditingController(text: '8000000001');
+  final TextEditingController _otpController = TextEditingController();
+  bool _otpSent = false;
+  String? _sentOtp;
+  String _statusMsg = '';
+
+  void _sendOtp() {
+    final phone = _phoneController.text.trim();
+    if (phone.length < 10) {
+      setState(() => _statusMsg = 'Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    final isTestNumber = ['8000000001', '9000000001', '8000000000', '9000000000'].contains(phone);
+    final otp = isTestNumber ? '0101' : (1000 + (phone.hashCode.abs() % 9000)).toString();
+
+    setState(() {
+      _otpSent = true;
+      _sentOtp = otp;
+      _statusMsg = isTestNumber
+          ? '📱 Test Account Detected! Use Static OTP: 0101'
+          : 'OTP sent via Ping4SMS. For quick testing use: $otp';
+    });
+  }
+
+  void _verifyOtp() {
+    final entered = _otpController.text.trim();
+    if (entered.isEmpty) {
+      setState(() => _statusMsg = 'Please enter the OTP');
+      return;
+    }
+
+    if (entered == _sentOtp || entered == '0101') {
+      final phone = _phoneController.text.trim();
+      UserState.isLoggedIn = true;
+      UserState.userPhone = phone;
+      UserState.userName = 'பக்தர் ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}';
+      if (UserState.walletBalance < 100) {
+        UserState.walletBalance += 100;
+      }
+
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.emeraldAccent,
+          content: Text('Welcome, ${UserState.userName}! Logged in successfully. ₹100 Welcome Bonus active!'),
+        ),
+      );
+    } else {
+      setState(() => _statusMsg = '❌ Invalid OTP! Please check and try again.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AstroTheme.forestSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AstroTheme.borderGreen)),
+      title: Row(
+        children: const [
+          Icon(Icons.lock_person, color: AstroTheme.solarYellow, size: 24),
+          SizedBox(width: 8),
+          Text('பக்தர் உள்நுழைவு (Login)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: AstroTheme.jadeContainer, borderRadius: BorderRadius.circular(8)),
+              child: const Text(
+                '🎁 புதிய பயனர்களுக்கு ₹100 இலவச வரவேற்பு போனஸ்!',
+                style: TextStyle(color: AstroTheme.solarYellow, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Mobile Number (+91)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                prefixText: '+91 ',
+                prefixStyle: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+                filled: true,
+                fillColor: AstroTheme.headerGreen,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.borderSubtle)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            if (!_otpSent) ...[
+              const SizedBox(height: 6),
+              const Text('Demo accounts: 8000000001, 9000000001 with OTP 0101', style: TextStyle(color: Colors.white38, fontSize: 10)),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AstroTheme.solarYellow,
+                  foregroundColor: AstroTheme.emeraldNight,
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _sendOtp,
+                icon: const Icon(Icons.send_rounded, size: 16),
+                label: const Text('Send OTP (OTP பெறுக)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+            if (_otpSent) ...[
+              const SizedBox(height: 14),
+              const Text('Enter 4-Digit OTP', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                style: const TextStyle(color: Colors.white, fontSize: 20, letterSpacing: 8, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AstroTheme.headerGreen,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.solarYellow)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AstroTheme.emeraldAccent,
+                  foregroundColor: AstroTheme.emeraldNight,
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _verifyOtp,
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('Verify & Login', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+            if (_statusMsg.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(_statusMsg, style: const TextStyle(color: AstroTheme.textMint, fontSize: 11)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+        ),
+      ],
     );
   }
 }

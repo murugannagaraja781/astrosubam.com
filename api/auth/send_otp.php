@@ -55,3 +55,4 @@ Response::json(true, $isBypass ? 'Test OTP applied. Use ' . SMS::STATIC_OTP : 'O
     'otp'       => $isBypass ? SMS::STATIC_OTP : null, // Only reveal in bypass mode for testers
     'expires_in'=> 600
 ]);
+
