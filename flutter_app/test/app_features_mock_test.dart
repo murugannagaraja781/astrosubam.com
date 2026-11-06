@@ -22,6 +22,7 @@ void main() {
     UserState.isLoggedIn = false;
     UserState.userName = 'Devotee User';
     UserState.userPhone = '8000000001';
+    UserState.userId = 2;
     for (var a in UserState.astrologers) {
       a['image'] = 'assets/logo.jpg';
     }
@@ -29,22 +30,14 @@ void main() {
 
   group('AstroSubam 100% Mock Data Feature Verification', () {
     // -------------------------------------------------------------------------
-    // TEST 1: MOBILE OTP LOGIN FLOW WITH TEST BYPASS
+    // TEST 1: APP LAUNCH AUTH SCREEN & MOBILE OTP LOGIN FLOW WITH TEST BYPASS
     // -------------------------------------------------------------------------
-    testWidgets('1. Test OTP Login Flow with Static OTP 0101 and Welcome Bonus', (WidgetTester tester) async {
+    testWidgets('1. Test App Launch Direct AuthScreen and OTP Login Flow', (WidgetTester tester) async {
       await tester.pumpWidget(const AstroSubamApp());
       await tester.pump();
 
-      // Verify app launched
+      // Verify app launched directly on AuthScreen
       expect(find.text('ASTROSUBAM'), findsOneWidget);
-
-      // Open Login Dialog
-      final loginBtn = find.byTooltip('Login with Mobile OTP');
-      expect(loginBtn, findsOneWidget);
-      await tester.tap(loginBtn);
-      await tester.pump();
-
-      // Verify Dialog Opened
       expect(find.text('பக்தர் உள்நுழைவு (Login)'), findsOneWidget);
 
       // Tap Send OTP
@@ -64,7 +57,7 @@ void main() {
       // Tap Verify & Login
       final verifyBtn = find.text('Verify & Login');
       await tester.tap(verifyBtn);
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       // Verify Logged in state
       expect(UserState.isLoggedIn, isTrue);
@@ -191,6 +184,43 @@ void main() {
 
       // Verify Astrologer response appeared
       expect(find.textContaining('Noted! Analyzing planetary transits'), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // TEST 5: WALLET RECHARGE & PAYMENT GATEWAY SHEET (UPI / CARDS / SUCCESS)
+    // -------------------------------------------------------------------------
+    testWidgets('5. Test Wallet Screen & Interactive Payment Gateway Sheet', (WidgetTester tester) async {
+      UserState.walletBalance = 200.0;
+      await tester.pumpWidget(const MaterialApp(
+        home: WalletScreen(),
+      ));
+      await tester.pump();
+
+      // Verify Wallet Screen Loaded
+      expect(find.text('My Wallet / பணப்பை'), findsOneWidget);
+      expect(find.text('₹200.00'), findsOneWidget);
+
+      // Tap + ₹100 Recharge pack
+      final packBtn = find.text('+ ₹100');
+      expect(packBtn, findsOneWidget);
+      await tester.tap(packBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Payment Gateway Modal Sheet opened
+      expect(find.text('AstroSubam Checkout'), findsOneWidget);
+      expect(find.text('₹100'), findsOneWidget);
+      expect(find.text('UPI (Instant)'), findsOneWidget);
+
+      // Tap Pay Securely
+      final payBtn = find.text('Pay ₹100 Securely ➔');
+      expect(payBtn, findsOneWidget);
+      await tester.tap(payBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Payment Success Dialog
+      expect(find.text('Payment Successful!'), findsOneWidget);
+      expect(find.text('VERIFIED (PAID)'), findsOneWidget);
+      expect(UserState.walletBalance, equals(300.0));
     });
   });
 }
