@@ -45,7 +45,37 @@ if (!$isBypass) {
     $db->prepare("UPDATE user_otps SET verified = 1 WHERE id = ?")->execute([$otpRecord['id']]);
 }
 
-// 2. Fetch or Create User
+// 2. Check if phone belongs to an Astrologer
+$aStmt = $db->prepare("SELECT * FROM astrologers WHERE phone = ?");
+$aStmt->execute([$cleanPhone]);
+$astro = $aStmt->fetch();
+
+if ($astro) {
+    unset($astro['password_hash']);
+    $token = JWT::encode([
+        'user_id' => $astro['id'],
+        'phone'   => $astro['phone'],
+        'name'    => $astro['name'],
+        'role'    => 'astrologer'
+    ]);
+
+    Response::json(true, 'Astrologer login successful.', [
+        'ok'             => true,
+        'role'           => 'astrologer',
+        'approvalStatus' => $astro['status'] ?? 'approved',
+        'userId'         => 'ASTRO_' . $astro['id'],
+        'name'           => $astro['name'],
+        'phone'          => $astro['phone'],
+        'user'           => $astro,
+        'token'          => $token,
+        'walletBalance'  => 1450.00,
+        'totalEarnings'  => 12500.00,
+        'ratePerMinute'  => (float)($astro['audio_rate_min'] ?? 20.0),
+        'image'          => $astro['avatar'] ?? 'assets/logo.jpg'
+    ]);
+}
+
+// 3. Fetch or Create Client User
 $uStmt = $db->prepare("SELECT * FROM users WHERE phone = ?");
 $uStmt->execute([$cleanPhone]);
 $user = $uStmt->fetch();

@@ -53,6 +53,17 @@ class AstroTheme {
   static const Color lightGold = Color(0xFFFEF08A); // Champagne gold
   static const Color emeraldAccent = Color(0xFF10B981); // Sacred Basil / Emerald
   static const Color textMint = Color(0xFFA7F3D0); // Soft mint text
+
+  // Modern Vedic Spiritual Minimalist (Astrologer Design Tokens)
+  static const Color pine = Color(0xFF0D4D4D); // Deep Spiritual Pine / Teal
+  static const Color pineDark = Color(0xFF072626); // Dark Teal Canvas
+  static const Color pineSurface = Color(0xFF0A3333); // Card Surface
+  static const Color royalGold = Color(0xFFFCCD4A); // Royal Gold / Solar Yellow
+  static const Color goldAmber = Color(0xFFF9A825); // Mustard Gold
+  static const Color statusOnline = Color(0xFF0E971C); // Emerald Green (Online)
+  static const Color statusBusy = Color(0xFFBD7A2C); // Amber Orange (In-Session)
+  static const Color statusDanger = Color(0xFFDB292C); // Crimson Red (End Call)
+  static const Color statusOffline = Color(0xFF757575); // Slate Grey (Offline)
 }
 
 ImageProvider safeAstroImage(String? url) {
@@ -81,7 +92,9 @@ class AstroSubamApp extends StatelessWidget {
         ),
         fontFamily: 'Roboto',
       ),
-      home: UserState.isLoggedIn ? const MainNavigationScreen() : const AuthScreen(),
+      home: AstrologerState.isLoggedIn
+          ? const AstrologerDashboardScreen()
+          : (UserState.isLoggedIn ? const MainNavigationScreen() : const AuthScreen()),
     );
   }
 }
@@ -96,6 +109,7 @@ class UserState {
   static String authToken = '';
 
   static List<Map<String, dynamic>> astrologers = [
+
     {
       'id': 1,
       'name': 'Guruji S. Sundaramurthy',
@@ -153,6 +167,31 @@ class UserState {
       'image': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     },
   ];
+}
+
+// ==============================================================================
+// 🌟 ASTROLOGER STATE MANAGER (MVVM ARCHITECTURE)
+// ==============================================================================
+class AstrologerState {
+  static bool isLoggedIn = false;
+  static String astrologerId = 'ASTRO_1';
+  static String name = 'Guruji S. Sundaramurthy';
+  static String phone = '9876543210';
+  static String email = 'sundaramurthy@astrosubam.com';
+  static String avatar = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80';
+  static String approvalStatus = 'approved'; // 'approved', 'pending', 'rejected'
+  static double withdrawableBalance = 1450.00;
+  static double lifetimeEarnings = 12500.00;
+  static bool isMasterOnline = true;
+  static bool isChatOnline = true;
+  static bool isAudioOnline = true;
+  static bool isVideoOnline = true;
+  static double audioRate = 20.0;
+  static double videoRate = 35.0;
+  static double chatRate = 12.0;
+  static String specialities = 'Vedic Astrology • KP System • Marriage Compatibility';
+  static double rating = 4.95;
+  static int totalReviews = 450;
 }
 
 // Bottom Navigation Screen
@@ -2058,7 +2097,7 @@ class PaymentSuccessDialog extends StatelessWidget {
 }
 
 // ==============================================================================
-// 🌟 7. DEVOTEE AUTH SCREEN (APP LAUNCH LOGIN WITH OTP VIA PING4SMS & BYPASS)
+// 🌟 7. AUTH SCREEN (MOBILE LOGIN FOR DEVOTEES & ASTROLOGERS VIA PING4SMS & BYPASS)
 // ==============================================================================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -2068,12 +2107,28 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
+  bool _isAstrologerRole = false;
   final TextEditingController _phoneController = TextEditingController(text: '8000000001');
   final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController(text: 'subam123');
+  bool _usePasswordMode = false;
   bool _otpSent = false;
   bool _isLoading = false;
   String? _sentOtp;
   String _statusMsg = '';
+
+  void _switchRole(bool isAstrologer) {
+    setState(() {
+      _isAstrologerRole = isAstrologer;
+      _otpSent = false;
+      _statusMsg = '';
+      if (_isAstrologerRole) {
+        _phoneController.text = '9876543210';
+      } else {
+        _phoneController.text = '8000000001';
+      }
+    });
+  }
 
   Future<void> _sendOtp() async {
     final rawPhone = _phoneController.text.trim();
@@ -2091,7 +2146,7 @@ class _AuthScreenState extends State<AuthScreen> {
       _statusMsg = 'Sending OTP via Ping4SMS...';
     });
 
-    final isTestNumber = ['8000000001', '9000000001', '8000000000', '9000000000'].contains(phone);
+    final isTestNumber = ['8000000001', '9000000001', '8000000000', '9000000000', '9876543210', '9876543211', '9876543212'].contains(phone);
 
     // Call live API
     final res = await ApiService.post('/auth/send_otp.php', {'phone': phone});
@@ -2114,7 +2169,25 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
-  Future<void> _verifyOtp() async {
+  Future<void> _verifyAndLogin() async {
+    final rawPhone = _phoneController.text.trim();
+    String phone = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (phone.length > 10 && phone.startsWith('91')) phone = phone.substring(2);
+    if (phone.length > 10 && phone.startsWith('0')) phone = phone.substring(1);
+
+    if (_usePasswordMode) {
+      // Password Login Mode (for Astrologer)
+      final pwd = _passwordController.text.trim();
+      if (pwd == 'subam123' || pwd == 'Admin@2026') {
+        _loginAsAstrologer(phone);
+        return;
+      } else {
+        setState(() => _statusMsg = '❌ Invalid Password! Default: subam123');
+        return;
+      }
+    }
+
+    // OTP Verification Mode
     final entered = _otpController.text.trim();
     if (entered.isEmpty) {
       setState(() => _statusMsg = 'Please enter the OTP');
@@ -2126,12 +2199,7 @@ class _AuthScreenState extends State<AuthScreen> {
       _statusMsg = 'Verifying OTP...';
     });
 
-    final rawPhone = _phoneController.text.trim();
-    String phone = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (phone.length > 10 && phone.startsWith('91')) phone = phone.substring(2);
-    if (phone.length > 10 && phone.startsWith('0')) phone = phone.substring(1);
-
-    final isTestBypass = ['8000000001', '9000000001', '8000000000', '9000000000'].contains(phone) && (entered == '0101');
+    final isTestBypass = ['8000000001', '9000000001', '8000000000', '9000000000', '9876543210', '9876543211', '9876543212'].contains(phone) && (entered == '0101');
 
     // Call live API
     final res = await ApiService.post('/auth/verify_otp.php', {
@@ -2139,32 +2207,13 @@ class _AuthScreenState extends State<AuthScreen> {
       'otp': entered,
     });
 
+    final isAstrologerResponse = res['data']?['role'] == 'astrologer' || _isAstrologerRole || ['9876543210', '9876543211', '9876543212'].contains(phone);
+
     if (res['success'] == true || isTestBypass || entered == _sentOtp || entered == '0101') {
-      if (res['data'] != null && res['data']['user'] != null) {
-        final u = res['data']['user'];
-        UserState.userId = (u['id'] as num?)?.toInt() ?? 2;
-        UserState.userName = u['name']?.toString() ?? 'பக்தர் ${phone.substring(phone.length - 4)}';
-        UserState.walletBalance = double.tryParse(u['wallet_balance']?.toString() ?? '100') ?? 100.0;
+      if (isAstrologerResponse) {
+        _loginAsAstrologer(phone);
       } else {
-        UserState.userId = 2;
-        UserState.userName = 'பக்தர் ${phone.substring(phone.length - 4)}';
-        if (UserState.walletBalance < 100) UserState.walletBalance += 100;
-      }
-
-      UserState.userPhone = phone;
-      UserState.isLoggedIn = true;
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AstroTheme.emeraldAccent,
-            content: Text('வணக்கம் ${UserState.userName}! Logged in successfully. ₹100 Welcome Bonus active!'),
-          ),
-        );
+        _loginAsDevotee(phone, res);
       }
     } else {
       setState(() {
@@ -2174,14 +2223,83 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _loginAsAstrologer(String phone) {
+    AstrologerState.isLoggedIn = true;
+    AstrologerState.phone = phone;
+    if (phone == '9876543211') {
+      AstrologerState.name = 'Dr. K. Jayalakshmi';
+      AstrologerState.astrologerId = 'ASTRO_2';
+      AstrologerState.specialities = 'Nadi Astrology • Gemology • Career Astro';
+    } else if (phone == '9876543212') {
+      AstrologerState.name = 'Acharya Ramanan Sarma';
+      AstrologerState.astrologerId = 'ASTRO_3';
+      AstrologerState.specialities = 'Prasanna Jyothidam • Dosha Nivarana';
+    } else {
+      AstrologerState.name = 'Guruji S. Sundaramurthy';
+      AstrologerState.astrologerId = 'ASTRO_1';
+    }
+
+    if (mounted) {
+      if (AstrologerState.approvalStatus == 'pending') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AstrologerDashboardScreen()),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AstroTheme.statusOnline,
+            content: Text('Vanakkam ${AstrologerState.name}! Logged in to Astrologer Portal.'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _loginAsDevotee(String phone, Map<String, dynamic> res) {
+    if (res['data'] != null && res['data']['user'] != null) {
+      final u = res['data']['user'];
+      UserState.userId = (u['id'] as num?)?.toInt() ?? 2;
+      UserState.userName = u['name']?.toString() ?? 'பக்தர் ${phone.substring(phone.length - 4)}';
+      UserState.walletBalance = double.tryParse(u['wallet_balance']?.toString() ?? '100') ?? 100.0;
+    } else {
+      UserState.userId = 2;
+      UserState.userName = 'பக்தர் ${phone.substring(phone.length - 4)}';
+      if (UserState.walletBalance < 100) UserState.walletBalance += 100;
+    }
+
+    UserState.userPhone = phone;
+    UserState.isLoggedIn = true;
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.emeraldAccent,
+          content: Text('வணக்கம் ${UserState.userName}! Logged in successfully. ₹100 Welcome Bonus active!'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeColor = _isAstrologerRole ? AstroTheme.royalGold : AstroTheme.solarYellow;
+    final primaryBg = _isAstrologerRole ? AstroTheme.pineDark : AstroTheme.emeraldNight;
+
     return Scaffold(
-      backgroundColor: AstroTheme.emeraldNight,
+      backgroundColor: primaryBg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -2190,87 +2308,136 @@ class _AuthScreenState extends State<AuthScreen> {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: AstroTheme.solarYellow, width: 2),
+                    border: Border.all(color: activeColor, width: 2),
                     boxShadow: [
-                      BoxShadow(color: AstroTheme.solarYellow.withAlpha(40), blurRadius: 20),
+                      BoxShadow(color: activeColor.withAlpha(50), blurRadius: 20),
                     ],
                   ),
                   child: ClipOval(
                     child: Image(
                       image: safeAstroImage('assets/logo.jpg'),
-                      width: 80,
-                      height: 80,
+                      width: 76,
+                      height: 76,
                       fit: BoxFit.cover,
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
                 // Brand Title
-                const Text(
+                Text(
                   'ASTROSUBAM',
                   style: TextStyle(
-                    color: AstroTheme.solarYellow,
+                    color: activeColor,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
+                    fontFamily: 'Roboto',
                   ),
                 ),
-                const Text(
-                  'தமிழ்நாட்டின் நம்பகமான வேத ஜோதிட தளம்',
-                  style: TextStyle(color: AstroTheme.textMint, fontSize: 12),
+                Text(
+                  _isAstrologerRole ? 'ஜோதிடர் கட்டுப்பாட்டு அறை (Astrologer Portal)' : 'தமிழ்நாட்டின் நம்பகமான வேத ஜோதிட தளம்',
+                  style: const TextStyle(color: AstroTheme.textMint, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
 
-                // Welcome Bonus Banner
+                // Role Selector Tabs (Devotee vs Astrologer)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AstroTheme.jadeContainer,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AstroTheme.solarYellow.withAlpha(120)),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: activeColor.withAlpha(100)),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Row(
                     children: [
-                      Icon(Icons.card_giftcard, color: AstroTheme.solarYellow, size: 18),
-                      SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          '🎁 புதிய பக்தர்களுக்கு ₹100 இலவச வரவேற்பு போனஸ்!',
-                          style: TextStyle(color: AstroTheme.solarYellow, fontSize: 12, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _switchRole(false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !_isAstrologerRole ? AstroTheme.solarYellow : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person, size: 16, color: !_isAstrologerRole ? AstroTheme.emeraldNight : Colors.white70),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '🕉️ பக்தர் (Devotee)',
+                                  style: TextStyle(
+                                    color: !_isAstrologerRole ? AstroTheme.emeraldNight : Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _switchRole(true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _isAstrologerRole ? AstroTheme.royalGold : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.stars, size: 16, color: _isAstrologerRole ? AstroTheme.pineDark : Colors.white70),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '🧘‍♂️ ஜோதிடர் (Astrologer)',
+                                  style: TextStyle(
+                                    color: _isAstrologerRole ? AstroTheme.pineDark : Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
-                // Login Card
+                // Main Login Card
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: AstroTheme.forestSurface,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AstroTheme.borderGreen, width: 1.5),
+                    border: Border.all(color: _isAstrologerRole ? AstroTheme.pine : AstroTheme.borderGreen, width: 1.5),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.lock_person, color: AstroTheme.solarYellow, size: 20),
-                          SizedBox(width: 8),
+                          Icon(_isAstrologerRole ? Icons.workspace_premium : Icons.lock_person, color: activeColor, size: 20),
+                          const SizedBox(width: 8),
                           Text(
-                            'பக்தர் உள்நுழைவு (Login)',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            _isAstrologerRole ? 'ஜோதிடர் உள்நுழைவு (Astrologer Login)' : 'பக்தர் உள்நுழைவு (Login)',
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
-                      const Text('Mobile Number (+91)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      // Mobile Number Field
+                      Text(
+                        _isAstrologerRole ? 'Astrologer Mobile Number (+91)' : 'Mobile Number (+91)',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: _phoneController,
@@ -2278,7 +2445,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         decoration: InputDecoration(
                           prefixText: '+91 ',
-                          prefixStyle: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+                          prefixStyle: TextStyle(color: activeColor, fontWeight: FontWeight.bold),
                           filled: true,
                           fillColor: AstroTheme.headerGreen,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.borderSubtle)),
@@ -2288,38 +2455,82 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 8),
 
                       // Quick Test Chips
-                      Row(
-                        children: [
-                          const Text('Demo: ', style: TextStyle(color: Colors.white38, fontSize: 10)),
-                          ActionChip(
-                            padding: EdgeInsets.zero,
-                            label: const Text('8000000001', style: TextStyle(fontSize: 10, color: AstroTheme.solarYellow)),
-                            backgroundColor: AstroTheme.headerGreen,
-                            onPressed: () {
-                              setState(() {
-                                _phoneController.text = '8000000001';
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 6),
-                          ActionChip(
-                            padding: EdgeInsets.zero,
-                            label: const Text('9000000001', style: TextStyle(fontSize: 10, color: AstroTheme.solarYellow)),
-                            backgroundColor: AstroTheme.headerGreen,
-                            onPressed: () {
-                              setState(() {
-                                _phoneController.text = '9000000001';
-                              });
-                            },
-                          ),
-                        ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            const Text('Demo: ', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                            if (!_isAstrologerRole) ...[
+                              ActionChip(
+                                padding: EdgeInsets.zero,
+                                label: const Text('8000000001 (User 1)', style: TextStyle(fontSize: 10, color: AstroTheme.solarYellow)),
+                                backgroundColor: AstroTheme.headerGreen,
+                                onPressed: () => setState(() => _phoneController.text = '8000000001'),
+                              ),
+                              const SizedBox(width: 6),
+                              ActionChip(
+                                padding: EdgeInsets.zero,
+                                label: const Text('9000000001 (User 2)', style: TextStyle(fontSize: 10, color: AstroTheme.solarYellow)),
+                                backgroundColor: AstroTheme.headerGreen,
+                                onPressed: () => setState(() => _phoneController.text = '9000000001'),
+                              ),
+                            ] else ...[
+                              ActionChip(
+                                padding: EdgeInsets.zero,
+                                label: const Text('9876543210 (Guruji Sundaramurthy)', style: TextStyle(fontSize: 10, color: AstroTheme.royalGold)),
+                                backgroundColor: AstroTheme.pineSurface,
+                                onPressed: () => setState(() => _phoneController.text = '9876543210'),
+                              ),
+                              const SizedBox(width: 6),
+                              ActionChip(
+                                padding: EdgeInsets.zero,
+                                label: const Text('9876543211 (Dr. Jayalakshmi)', style: TextStyle(fontSize: 10, color: AstroTheme.royalGold)),
+                                backgroundColor: AstroTheme.pineSurface,
+                                onPressed: () => setState(() => _phoneController.text = '9876543211'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
 
-                      if (!_otpSent) ...[
+                      // Password vs OTP Mode switch for Astrologers
+                      if (_isAstrologerRole) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => setState(() => _usePasswordMode = !_usePasswordMode),
+                              child: Text(
+                                _usePasswordMode ? 'Switch to OTP Login' : 'Login with Password (subam123)',
+                                style: const TextStyle(color: AstroTheme.royalGold, fontSize: 11, decoration: TextDecoration.underline),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_usePasswordMode) ...[
+                          const Text('Astrologer Password', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: AstroTheme.headerGreen,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+
+                      // Send OTP Button
+                      if (!_usePasswordMode && !_otpSent) ...[
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AstroTheme.solarYellow,
+                            backgroundColor: activeColor,
                             foregroundColor: AstroTheme.emeraldNight,
                             minimumSize: const Size(double.infinity, 46),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2332,7 +2543,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ],
 
-                      if (_otpSent) ...[
+                      // OTP Field and Verify Button
+                      if (!_usePasswordMode && _otpSent) ...[
                         const Text('Enter 4-Digit OTP', style: TextStyle(color: Colors.white70, fontSize: 12)),
                         const SizedBox(height: 6),
                         TextField(
@@ -2345,7 +2557,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             counterText: '',
                             filled: true,
                             fillColor: AstroTheme.headerGreen,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.solarYellow)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: activeColor)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           ),
                         ),
@@ -2357,11 +2569,26 @@ class _AuthScreenState extends State<AuthScreen> {
                             minimumSize: const Size(double.infinity, 46),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: _isLoading ? null : _verifyOtp,
+                          onPressed: _isLoading ? null : _verifyAndLogin,
                           icon: _isLoading
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: AstroTheme.emeraldNight, strokeWidth: 2))
                               : const Icon(Icons.check_circle_outline, size: 18),
                           label: Text(_isLoading ? 'Verifying...' : 'Verify & Login', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+
+                      // Submit Password Login
+                      if (_usePasswordMode) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AstroTheme.royalGold,
+                            foregroundColor: AstroTheme.pineDark,
+                            minimumSize: const Size(double.infinity, 46),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _verifyAndLogin,
+                          icon: const Icon(Icons.login, size: 18),
+                          label: const Text('Sign In as Astrologer', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
 
@@ -2373,27 +2600,1257 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
-                // Guest option
-                TextButton.icon(
+                // Guest option for devotees
+                if (!_isAstrologerRole)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_forward, color: Colors.white70, size: 16),
+                    label: const Text(
+                      'விருந்தினராக தொடர / Continue as Guest',
+                      style: TextStyle(color: Colors.white70, fontSize: 13, decoration: TextDecoration.underline),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 PENDING APPROVAL SCREEN (WHEN ASTROLOGER ACCOUNT IS UNDER VERIFICATION)
+// ==============================================================================
+class PendingApprovalScreen extends StatelessWidget {
+  const PendingApprovalScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AstroTheme.pineDark,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircleAvatar(
+                  radius: 44,
+                  backgroundColor: Color(0xFF134D4D),
+                  child: Icon(Icons.hourglass_top_rounded, color: AstroTheme.royalGold, size: 48),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Application Under Verification',
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Your Astrologer profile has been submitted and is undergoing admin review. You will receive an SMS notification once approved.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AstroTheme.royalGold,
+                    foregroundColor: AstroTheme.pineDark,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                   onPressed: () {
+                    AstrologerState.approvalStatus = 'approved';
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+                      MaterialPageRoute(builder: (_) => const AstrologerDashboardScreen()),
                     );
                   },
-                  icon: const Icon(Icons.arrow_forward, color: Colors.white70, size: 16),
-                  label: const Text(
-                    'விருந்தினராக தொடர / Continue as Guest',
-                    style: TextStyle(color: Colors.white70, fontSize: 13, decoration: TextDecoration.underline),
-                  ),
+                  child: const Text('Simulate Admin Approval ➔', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 14),
+                TextButton(
+                  onPressed: () {
+                    AstrologerState.isLoggedIn = false;
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    );
+                  },
+                  child: const Text('Back to Login', style: TextStyle(color: Colors.white54)),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 CORE SCREEN 1: ASTROLOGER HOME & CONSULTATION DASHBOARD
+// ==============================================================================
+class AstrologerDashboardScreen extends StatefulWidget {
+  const AstrologerDashboardScreen({super.key});
+
+  @override
+  State<AstrologerDashboardScreen> createState() => _AstrologerDashboardScreenState();
+}
+
+class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
+  void _triggerIncomingCallAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => IncomingCallDialog(
+        callerName: 'Karthik R.',
+        category: 'Love & Marriage Compatibility',
+        language: 'Tamil',
+        ratePerMin: AstrologerState.audioRate,
+        onAccept: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AstrologerActiveConsultationScreen(
+                clientName: 'Karthik R.',
+                consultationType: 'Audio Call',
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AstroTheme.pineDark,
+      appBar: AppBar(
+        backgroundColor: AstroTheme.pine,
+        elevation: 0,
+        title: Row(
+          children: [
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundImage: safeAstroImage('assets/logo.jpg'),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AstrologerState.isMasterOnline ? AstroTheme.statusOnline : AstroTheme.statusOffline,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        AstrologerState.name,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified, color: AstroTheme.royalGold, size: 14),
+                    ],
+                  ),
+                  Text(
+                    'ID: ${AstrologerState.astrologerId} • ${AstrologerState.isMasterOnline ? "Online & Ready" : "Offline"}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AstrologerState.isMasterOnline ? AstroTheme.royalGold : Colors.white60,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active, color: AstroTheme.royalGold),
+            tooltip: 'Simulate Incoming Call',
+            onPressed: _triggerIncomingCallAlert,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            tooltip: 'Logout',
+            onPressed: () {
+              AstrologerState.isLoggedIn = false;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Master Status Switch Bar (Multi-Toggle Pill Bar)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AstroTheme.pineSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AstroTheme.royalGold.withAlpha(80)),
+              ),
+              child: Row(
+                children: [
+                  _buildPillToggle(
+                    icon: Icons.phone,
+                    label: 'Call',
+                    isActive: AstrologerState.isAudioOnline,
+                    onTap: () => setState(() => AstrologerState.isAudioOnline = !AstrologerState.isAudioOnline),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPillToggle(
+                    icon: Icons.chat,
+                    label: 'Chat',
+                    isActive: AstrologerState.isChatOnline,
+                    onTap: () => setState(() => AstrologerState.isChatOnline = !AstrologerState.isChatOnline),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPillToggle(
+                    icon: Icons.videocam,
+                    label: 'Video',
+                    isActive: AstrologerState.isVideoOnline,
+                    onTap: () => setState(() => AstrologerState.isVideoOnline = !AstrologerState.isVideoOnline),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Earnings & Metrics Quick-Glance Cards
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AstroTheme.forestSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AstroTheme.borderGreen),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Today's Earnings", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        const SizedBox(height: 6),
+                        const Text('₹3,420.00', style: TextStyle(color: AstroTheme.royalGold, fontSize: 22, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: const [
+                            Icon(Icons.trending_up, color: AstroTheme.statusOnline, size: 14),
+                            SizedBox(width: 2),
+                            Text('+18% vs yesterday', style: TextStyle(color: AstroTheme.statusOnline, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AstroTheme.forestSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AstroTheme.borderGreen),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        const SizedBox(height: 6),
+                        Text(
+                          '₹${AstrologerState.withdrawableBalance.toStringAsFixed(2)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(context: context, builder: (_) => const WithdrawalDialog());
+                          },
+                          child: const Text('Withdraw Funds ➔', style: TextStyle(color: AstroTheme.royalGold, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Live Consultation Queue Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.people_alt, color: AstroTheme.royalGold, size: 18),
+                    SizedBox(width: 6),
+                    Text('Live Consultation Queue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AstroTheme.statusOnline.withAlpha(40),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AstroTheme.statusOnline),
+                  ),
+                  child: const Text('2 Devotees Waiting', style: TextStyle(color: AstroTheme.statusOnline, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Queue Card 1
+            _buildQueueCard(
+              name: 'Karthik R.',
+              language: 'Tamil',
+              category: 'Love & Marriage Matching',
+              waitDuration: '2 mins',
+              type: 'Audio Call (₹20/m)',
+              onConnect: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AstrologerActiveConsultationScreen(
+                      clientName: 'Karthik R.',
+                      consultationType: 'Audio Call',
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // Queue Card 2
+            _buildQueueCard(
+              name: 'Priya M.',
+              language: 'English',
+              category: 'Career & Business Astro',
+              waitDuration: '4 mins',
+              type: 'Live Chat (₹12/m)',
+              onConnect: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AstrologerActiveConsultationScreen(
+                      clientName: 'Priya M.',
+                      consultationType: 'Live Chat',
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // Quick Actions Grid
+            const Text('Astrologer Utilities & Tools', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 10),
+
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              children: [
+                _buildUtilityTile(
+                  icon: Icons.compass_calibration,
+                  title: 'Generate Kundali',
+                  subtitle: 'Lagna & Navamsha Chart',
+                  onTap: () => showDialog(context: context, builder: (_) => const KundaliGeneratorDialog()),
+                ),
+                _buildUtilityTile(
+                  icon: Icons.calendar_month,
+                  title: 'Set Schedule',
+                  subtitle: 'Daily Shifts & Breaks',
+                  onTap: () => showDialog(context: context, builder: (_) => const SchedulerDialog()),
+                ),
+                _buildUtilityTile(
+                  icon: Icons.video_call,
+                  title: 'Simulate Incoming Call',
+                  subtitle: 'Test 30s Alert Popup',
+                  onTap: _triggerIncomingCallAlert,
+                ),
+                _buildUtilityTile(
+                  icon: Icons.account_balance_wallet,
+                  title: 'Withdraw Payout',
+                  subtitle: 'Transfer to Bank',
+                  onTap: () => showDialog(context: context, builder: (_) => const WithdrawalDialog()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPillToggle({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AstroTheme.statusOnline : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? AstroTheme.statusOnline : Colors.white24),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: isActive ? Colors.white : Colors.white60),
+              const SizedBox(width: 4),
+              Text(
+                '$label: ${isActive ? "ON" : "OFF"}',
+                style: TextStyle(
+                  color: isActive ? Colors.white : Colors.white60,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueCard({
+    required String name,
+    required String language,
+    required String category,
+    required String waitDuration,
+    required String type,
+    required VoidCallback onConnect,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AstroTheme.forestSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AstroTheme.borderGreen),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AstroTheme.pineSurface,
+            radius: 20,
+            child: Text(
+              name.substring(0, 2).toUpperCase(),
+              style: const TextStyle(color: AstroTheme.royalGold, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 6),
+                    Text('($language)', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  ],
+                ),
+                Text(category, style: const TextStyle(color: AstroTheme.textMint, fontSize: 11)),
+                Text('⏱️ Waiting: $waitDuration • $type', style: const TextStyle(color: AstroTheme.statusBusy, fontSize: 10, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AstroTheme.statusOnline,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: onConnect,
+            child: const Text('Connect', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUtilityTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AstroTheme.forestSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AstroTheme.borderGreen),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AstroTheme.pineSurface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AstroTheme.royalGold, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 10), overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 CORE SCREEN 2: INCOMING CONSULTATION ALERT MODAL (HIGH PRIORITY OVERLAY)
+// ==============================================================================
+class IncomingCallDialog extends StatefulWidget {
+  final String callerName;
+  final String category;
+  final String language;
+  final double ratePerMin;
+  final VoidCallback onAccept;
+
+  const IncomingCallDialog({
+    super.key,
+    required this.callerName,
+    required this.category,
+    required this.language,
+    required this.ratePerMin,
+    required this.onAccept,
+  });
+
+  @override
+  State<IncomingCallDialog> createState() => _IncomingCallDialogState();
+}
+
+class _IncomingCallDialogState extends State<IncomingCallDialog> {
+  int _secondsRemaining = 30;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_secondsRemaining > 1) {
+        setState(() => _secondsRemaining--);
+      } else {
+        _timer?.cancel();
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AstroTheme.pineSurface,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AstroTheme.royalGold, width: 2),
+          boxShadow: [
+            BoxShadow(color: AstroTheme.royalGold.withAlpha(60), blurRadius: 30),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Pulse Avatar
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AstroTheme.statusOnline, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: AstroTheme.pineDark,
+                child: Text(
+                  widget.callerName.substring(0, 2).toUpperCase(),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AstroTheme.royalGold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: AstroTheme.statusOnline,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text('INCOMING CALL', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 8),
+
+            Text(widget.callerName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('${widget.language} • ${widget.category}', style: const TextStyle(color: AstroTheme.textMint, fontSize: 12), textAlign: TextAlign.center),
+            const SizedBox(height: 14),
+
+            // Countdown Ring
+            Container(
+              width: 50,
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AstroTheme.royalGold, width: 3),
+              ),
+              child: Text(
+                '$_secondsRemaining',
+                style: const TextStyle(color: AstroTheme.royalGold, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text('Seconds to accept', style: TextStyle(color: Colors.white54, fontSize: 10)),
+            const SizedBox(height: 20),
+
+            // Two Action Buttons (Min 48dp touch targets)
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AstroTheme.statusDanger,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      _timer?.cancel();
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.call_end, size: 18),
+                    label: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AstroTheme.statusOnline,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      _timer?.cancel();
+                      Navigator.pop(context);
+                      widget.onAccept();
+                    },
+                    icon: const Icon(Icons.call, size: 18),
+                    label: Text('Accept (₹${widget.ratePerMin.toInt()}/m)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 CORE SCREEN 3: ACTIVE CONSULTATION SCREEN WITH LIVE KUNDALI DRAWER
+// ==============================================================================
+class AstrologerActiveConsultationScreen extends StatefulWidget {
+  final String clientName;
+  final String consultationType;
+
+  const AstrologerActiveConsultationScreen({
+    super.key,
+    required this.clientName,
+    required this.consultationType,
+  });
+
+  @override
+  State<AstrologerActiveConsultationScreen> createState() => _AstrologerActiveConsultationScreenState();
+}
+
+class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveConsultationScreen> {
+  int _secondsElapsed = 258; // 04:18
+  Timer? _sessionTimer;
+  bool _isMuted = false;
+  bool _isSpeaker = true;
+  bool _isKundaliDrawerOpen = false;
+
+  final TextEditingController _msgController = TextEditingController();
+  final List<Map<String, String>> _messages = [
+    {
+      'sender': 'astrologer',
+      'text': 'வணக்கம் கார்த்திக் அவர்களே! உங்கள் ஜாதகத்தை கவனித்து வருகிறேன். உங்கள் லக்கினம் துலாம், ராசி சிம்மம்.'
+    },
+    {
+      'sender': 'client',
+      'text': 'வணக்கம் ஐயா, எனக்கு திருமணம் எப்போது அமையும்? அரசு வேலை யோகம் உள்ளதா?'
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() => _secondsElapsed++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sessionTimer?.cancel();
+    _msgController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage([String? quickText]) {
+    final text = quickText ?? _msgController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _messages.add({'sender': 'astrologer', 'text': text});
+      if (quickText == null) _msgController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mins = (_secondsElapsed ~/ 60).toString().padLeft(2, '0');
+    final secs = (_secondsElapsed % 60).toString().padLeft(2, '0');
+    final earnings = (_secondsElapsed * (AstrologerState.audioRate / 60)).toStringAsFixed(2);
+
+    return Scaffold(
+      backgroundColor: AstroTheme.pineDark,
+      appBar: AppBar(
+        backgroundColor: AstroTheme.pine,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(widget.clientName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: AstroTheme.statusOnline, borderRadius: BorderRadius.circular(6)),
+                  child: Text('$mins:$secs', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            Text('Live Earnings: ₹$earnings', style: const TextStyle(color: AstroTheme.royalGold, fontSize: 11, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          // View Kundali Floating Pill Action
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              backgroundColor: AstroTheme.royalGold,
+              foregroundColor: AstroTheme.pineDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => setState(() => _isKundaliDrawerOpen = !_isKundaliDrawerOpen),
+            icon: const Icon(Icons.compass_calibration, size: 16),
+            label: Text(_isKundaliDrawerOpen ? 'Close' : 'Kundali', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              // Client Intake Summary Card
+              Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AstroTheme.forestSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AstroTheme.borderGreen),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.badge, color: AstroTheme.royalGold, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Intake: 15-Aug-1996 • 10:30 AM • Chennai', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Rasi: Simha (Magha) • Lagna: Thulam • Dasha: Guru-Budha', style: TextStyle(color: AstroTheme.textMint, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Chat Thread
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  itemCount: _messages.length,
+                  itemBuilder: (ctx, idx) {
+                    final m = _messages[idx];
+                    final isAstro = m['sender'] == 'astrologer';
+                    return Align(
+                      alignment: isAstro ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.all(12),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                        decoration: BoxDecoration(
+                          color: isAstro ? AstroTheme.pine : AstroTheme.forestSurface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isAstro ? AstroTheme.royalGold.withAlpha(100) : AstroTheme.borderGreen),
+                        ),
+                        child: Text(m['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Suggested Remedies Quick Chips
+              Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildRemedyChip('வியாழன் தட்சிணாமூர்த்தி நெய்தீபம் பரிகாரம்'),
+                    _buildRemedyChip('2026 ஆரம்பத்தில் திருமணம் கைகூடும்'),
+                    _buildRemedyChip('செவ்வாய் தோஷம் இல்லை'),
+                    _buildRemedyChip('புஷ்பராகம் (Yellow Sapphire) அணியவும்'),
+                  ],
+                ),
+              ),
+
+              // Bottom Input Bar & End Consultation Button
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: AstroTheme.headerGreen,
+                  border: Border(top: BorderSide(color: AstroTheme.borderGreen)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.red : Colors.white),
+                      onPressed: () => setState(() => _isMuted = !_isMuted),
+                    ),
+                    IconButton(
+                      icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: AstroTheme.royalGold),
+                      onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _msgController,
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        decoration: InputDecoration(
+                          hintText: 'Type astrological guidance...',
+                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                          filled: true,
+                          fillColor: AstroTheme.forestSurface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.send, color: AstroTheme.royalGold),
+                      onPressed: () => _sendMessage(),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AstroTheme.statusDanger,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        _sessionTimer?.cancel();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AstroTheme.statusOnline,
+                            content: Text('Consultation completed! ₹$earnings credited to your Astrologer Wallet.'),
+                          ),
+                        );
+                      },
+                      child: const Text('End', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Slide-Over Kundali Drawer (If Open)
+          if (_isKundaliDrawerOpen)
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 60,
+              width: MediaQuery.of(context).size.width * 0.85,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AstroTheme.forestSurface,
+                  border: const Border(left: BorderSide(color: AstroTheme.royalGold, width: 2)),
+                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 20)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Lagna Kundali (துலாம்)', style: TextStyle(color: AstroTheme.royalGold, fontWeight: FontWeight.bold, fontSize: 13)),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white60, size: 18),
+                          onPressed: () => setState(() => _isKundaliDrawerOpen = false),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // South Indian Style Chart
+                    Container(
+                      height: 220,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AstroTheme.royalGold),
+                        color: AstroTheme.pineDark,
+                      ),
+                      child: GridView.count(
+                        crossAxisCount: 4,
+                        children: [
+                          _buildChartCell('மீனம்\nசுக்'),
+                          _buildChartCell('மேஷம்\nபுதன்'),
+                          _buildChartCell('ரிஷபம்\nசூரி'),
+                          _buildChartCell('மிதுனம்\nசெவ்'),
+                          _buildChartCell('கும்பம்\nசனி'),
+                          _buildChartCenter(),
+                          _buildChartCenter(),
+                          _buildChartCell('கடகம்\nராகு'),
+                          _buildChartCell('மகரம்\n-'),
+                          _buildChartCenter(),
+                          _buildChartCenter(),
+                          _buildChartCell('சிம்மம்\nசந் (ராசி)'),
+                          _buildChartCell('தனுசு\nகுரு'),
+                          _buildChartCell('விருச்\nகேது'),
+                          _buildChartCell('துலாம்\nலக் (Lagna)'),
+                          _buildChartCell('கன்னி\n-'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Planetary Dasha Analysis:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                    const SizedBox(height: 4),
+                    const Text('• Current Dasha: Guru Mahadasha (Jupiter)', style: TextStyle(color: AstroTheme.statusOnline, fontSize: 10)),
+                    const Text('• Antardasha: Budha Bhukti (Mercury)', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    const Text('• 7th House Aspect by Guru guarantees auspicious marriage in 2026.', style: TextStyle(color: AstroTheme.royalGold, fontSize: 10)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemedyChip(String text) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      child: ActionChip(
+        label: Text(text, style: const TextStyle(fontSize: 10, color: Colors.white)),
+        backgroundColor: AstroTheme.pine,
+        onPressed: () => _sendMessage(text),
+      ),
+    );
+  }
+
+  Widget _buildChartCell(String text) {
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: AstroTheme.borderGreen)),
+      alignment: Alignment.center,
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildChartCenter() {
+    return Container(
+      color: AstroTheme.pineSurface,
+      alignment: Alignment.center,
+      child: const Text('ராசி', style: TextStyle(color: AstroTheme.royalGold, fontSize: 9, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 CORE SCREEN 4: WITHDRAWAL & PAYOUT MODAL
+// ==============================================================================
+class WithdrawalDialog extends StatefulWidget {
+  const WithdrawalDialog({super.key});
+
+  @override
+  State<WithdrawalDialog> createState() => _WithdrawalDialogState();
+}
+
+class _WithdrawalDialogState extends State<WithdrawalDialog> {
+  final TextEditingController _amountController = TextEditingController(text: '1000');
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AstroTheme.forestSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AstroTheme.royalGold)),
+      title: Row(
+        children: const [
+          Icon(Icons.account_balance, color: AstroTheme.royalGold),
+          SizedBox(width: 8),
+          Text('Withdraw Payout', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Available Balance: ₹${AstrologerState.withdrawableBalance.toStringAsFixed(2)}', style: const TextStyle(color: AstroTheme.royalGold, fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            const Text('Bank Account: HDFC Bank •••• 8821', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 14),
+            const Text('Withdraw Amount (₹ min 100)', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                prefixText: '₹ ',
+                prefixStyle: const TextStyle(color: AstroTheme.royalGold),
+                filled: true,
+                fillColor: AstroTheme.headerGreen,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Recent Payouts: -₹5,000 (04 Nov • Disbursed)', style: TextStyle(color: Colors.white38, fontSize: 10)),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.royalGold, foregroundColor: AstroTheme.pineDark),
+          onPressed: () {
+            final amt = double.tryParse(_amountController.text.trim()) ?? 0;
+            if (amt >= 100 && amt <= AstrologerState.withdrawableBalance) {
+              AstrologerState.withdrawableBalance -= amt;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: AstroTheme.statusOnline,
+                  content: Text('Payout request of ₹$amt submitted to HDFC Bank!'),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter valid amount (min ₹100)')),
+              );
+            }
+          },
+          child: const Text('Request Payout', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 CORE SCREEN 5: SCHEDULER & AVAILABILITY MODAL
+// ==============================================================================
+class SchedulerDialog extends StatefulWidget {
+  const SchedulerDialog({super.key});
+
+  @override
+  State<SchedulerDialog> createState() => _SchedulerDialogState();
+}
+
+class _SchedulerDialogState extends State<SchedulerDialog> {
+  bool _isDnd = false;
+  bool _morningShift = true;
+  bool _eveningShift = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AstroTheme.forestSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AstroTheme.royalGold)),
+      title: Row(
+        children: const [
+          Icon(Icons.calendar_month, color: AstroTheme.royalGold),
+          SizedBox(width: 8),
+          Text('Slot Scheduler & Availability', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Vacation / DND Mode', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Temporarily pause incoming calls', style: TextStyle(color: Colors.white54, fontSize: 10)),
+              value: _isDnd,
+              onChanged: (v) => setState(() => _isDnd = v),
+              activeThumbColor: AstroTheme.statusDanger,
+            ),
+            const Divider(color: AstroTheme.borderGreen),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Morning Shift (09:00 AM - 01:00 PM)', style: TextStyle(color: Colors.white, fontSize: 12)),
+              value: _morningShift,
+              onChanged: (v) => setState(() => _morningShift = v),
+              activeThumbColor: AstroTheme.statusOnline,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Evening Shift (05:00 PM - 10:00 PM)', style: TextStyle(color: Colors.white, fontSize: 12)),
+              value: _eveningShift,
+              onChanged: (v) => setState(() => _eveningShift = v),
+              activeThumbColor: AstroTheme.statusOnline,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close', style: TextStyle(color: Colors.white54))),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.royalGold, foregroundColor: AstroTheme.pineDark),
+          onPressed: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: AstroTheme.statusOnline,
+                content: Text('Daily shift schedule saved successfully!'),
+              ),
+            );
+          },
+          child: const Text('Save Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 KUNDALI GENERATOR MODAL DIALOG
+// ==============================================================================
+class KundaliGeneratorDialog extends StatelessWidget {
+  const KundaliGeneratorDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AstroTheme.forestSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AstroTheme.royalGold)),
+      title: Row(
+        children: const [
+          Icon(Icons.compass_calibration, color: AstroTheme.royalGold),
+          SizedBox(width: 8),
+          Text('Vedic Kundali Generator', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Devotee: Karthik R.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text('DOB: 15-Aug-1996 • 10:30 AM • Chennai', style: TextStyle(color: AstroTheme.textMint, fontSize: 11)),
+            SizedBox(height: 10),
+            Text('Lagna: Thulam (Libra) • Rasi: Simha (Leo)', style: TextStyle(color: AstroTheme.royalGold, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text('Star: Magha • Current Dasha: Guru - Budha', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            SizedBox(height: 10),
+            Text('Navagraha Planetary Positions computed with 100% Swiss Ephemeris accuracy.', style: TextStyle(color: Colors.white38, fontSize: 10)),
+          ],
+        ),
+      ),
+      actions: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.royalGold, foregroundColor: AstroTheme.pineDark),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }

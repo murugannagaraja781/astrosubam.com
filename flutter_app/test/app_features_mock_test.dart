@@ -222,5 +222,122 @@ void main() {
       expect(find.text('VERIFIED (PAID)'), findsOneWidget);
       expect(UserState.walletBalance, equals(300.0));
     });
+
+    // -------------------------------------------------------------------------
+    // TEST 6: ASTROLOGER LOGIN & MODERN VEDIC SPIRITUAL MINIMALIST DASHBOARD
+    // -------------------------------------------------------------------------
+    testWidgets('6. Test Astrologer Mobile Login & Vedic Dashboard Features', (WidgetTester tester) async {
+      AstrologerState.isLoggedIn = false;
+      UserState.isLoggedIn = false;
+
+      await tester.pumpWidget(const AstroSubamApp());
+      await tester.pumpAndSettle();
+
+      // Tap Astrologer Role Tab
+      final astroRoleTab = find.text('🧘‍♂️ ஜோதிடர் (Astrologer)');
+      expect(astroRoleTab, findsOneWidget);
+      await tester.tap(astroRoleTab);
+      await tester.pumpAndSettle();
+
+      // Tap Guruji Sundaramurthy chip
+      final gurujiChip = find.text('9876543210 (Guruji Sundaramurthy)');
+      expect(gurujiChip, findsOneWidget);
+      await tester.tap(gurujiChip);
+      await tester.pumpAndSettle();
+
+      // Tap Send OTP
+      final sendOtpBtn = find.text('Send OTP (OTP பெறுக)');
+      await tester.ensureVisible(sendOtpBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(sendOtpBtn);
+      await tester.pumpAndSettle();
+
+      // Verify OTP banner
+      expect(find.text('📱 Test Account Detected! Use Static OTP: 0101'), findsOneWidget);
+
+      // Enter OTP 0101
+      final otpFields = find.byType(TextField);
+      await tester.enterText(otpFields.last, '0101');
+      await tester.pumpAndSettle();
+
+      // Ensure Verify Button is visible and tap
+      final verifyBtn = find.text('Verify & Login');
+      await tester.ensureVisible(verifyBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(verifyBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Astrologer Dashboard is Loaded
+      expect(AstrologerState.isLoggedIn, isTrue);
+      expect(find.text('Guruji S. Sundaramurthy'), findsOneWidget);
+
+      // Check Master Status Multi-Toggle Pill Bar
+      expect(find.textContaining('Call: ON'), findsOneWidget);
+      expect(find.textContaining('Chat: ON'), findsOneWidget);
+      expect(find.textContaining('Video: ON'), findsOneWidget);
+
+      // Check Metrics Quick-Glance Cards
+      expect(find.text("Today's Earnings"), findsOneWidget);
+      expect(find.text('Wallet Balance'), findsOneWidget);
+
+      // Check Live Consultation Queue
+      expect(find.text('Live Consultation Queue'), findsOneWidget);
+      expect(find.text('Karthik R.'), findsOneWidget);
+      expect(find.text('Priya M.'), findsOneWidget);
+
+      // Check Quick Action Grid
+      final kundaliBtn = find.text('Generate Kundali');
+      await tester.ensureVisible(kundaliBtn);
+      await tester.pumpAndSettle();
+      expect(kundaliBtn, findsOneWidget);
+
+      // Tap on "Generate Kundali" dialog
+      await tester.tap(kundaliBtn);
+      await tester.pumpAndSettle();
+      expect(find.text('Vedic Kundali Generator'), findsOneWidget);
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      // Tap on "Withdraw Payout" dialog
+      final withdrawBtn = find.text('Withdraw Payout');
+      await tester.ensureVisible(withdrawBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(withdrawBtn);
+      await tester.pumpAndSettle();
+      expect(find.text('Withdraw Payout'), findsWidgets);
+      expect(find.textContaining('HDFC Bank'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      // Tap on "Simulate Incoming Call" utility tile to open Screen 2 (Incoming Alert Modal)
+      final alertTile = find.text('Simulate Incoming Call');
+      await tester.ensureVisible(alertTile);
+      await tester.pumpAndSettle();
+      await tester.tap(alertTile);
+      await tester.pumpAndSettle();
+
+      // Verify Incoming Call Alert Modal
+      expect(find.text('INCOMING CALL'), findsOneWidget);
+      expect(find.textContaining('Love & Marriage Compatibility'), findsOneWidget);
+      expect(find.textContaining('Accept'), findsOneWidget);
+
+      // Accept Consultation to open Screen 3 (Active Consultation with Live Kundali Drawer)
+      final acceptBtn = find.textContaining('Accept');
+      await tester.tap(acceptBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Active Consultation Screen
+      expect(find.text('Karthik R.'), findsWidgets);
+      expect(find.text('Kundali'), findsOneWidget);
+      expect(find.textContaining('Live Earnings:'), findsOneWidget);
+      expect(find.textContaining('திருமணம் கைகூடும்'), findsOneWidget);
+      expect(find.text('End'), findsOneWidget);
+
+      // Open Live Kundali Drawer
+      await tester.tap(find.text('Kundali'));
+      await tester.pumpAndSettle();
+      expect(find.text('Lagna Kundali (துலாம்)'), findsOneWidget);
+      expect(find.text('ராசி'), findsWidgets);
+    });
   });
 }
