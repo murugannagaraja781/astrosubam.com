@@ -50,6 +50,24 @@ try {
         } else {
             $dbError = $lastErr;
         }
+
+        // Local dev zero-downtime fallback: SQLite
+        if ($pdo === null) {
+            try {
+                $sqliteDir = __DIR__ . '/../database';
+                if (!is_dir($sqliteDir)) {
+                    @mkdir($sqliteDir, 0777, true);
+                }
+                $sqlitePath = $sqliteDir . '/astrosubam_dev.sqlite';
+                $pdo = new PDO("sqlite:" . $sqlitePath, null, null, [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                ]);
+                $dbError = null;
+            } catch (\Throwable $e3) {
+                $dbError = $lastErr ?? $e3->getMessage();
+            }
+        }
     }
 } catch (\Throwable $t) {
     $pdo = null;

@@ -215,6 +215,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recharge_user_wallet'
     }
 }
 
+// 5. Action: Customer Support Ticket Reply & Status Update (SageTalkz Workflow 8)
+require_once __DIR__ . '/../helpers/SupportHelper.php';
+try {
+    SupportHelper::ensureTables($db);
+} catch (\Throwable $e) {}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_ticket_reply'])) {
+    $ticketId = (int)($_POST['ticket_id'] ?? 0);
+    $replyText = trim($_POST['reply_message'] ?? '');
+    $newStatus = trim($_POST['ticket_status'] ?? '');
+
+    if ($ticketId > 0) {
+        if (!empty($replyText)) {
+            $msgStmt = $db->prepare("INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message) VALUES (?, 'admin', 'Super Admin Desk', ?)");
+            $msgStmt->execute([$ticketId, $replyText]);
+        }
+        if (!empty($newStatus) && in_array($newStatus, ['WAITING', 'OPEN', 'CLOSED'], true)) {
+            $upd = $db->prepare("UPDATE support_tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $upd->execute([$newStatus, $ticketId]);
+        }
+        $toastMessage = "✅ டிக்கெட் #{$ticketId} பதில் மற்றும் நிலை வெற்றிகரமாக புதுப்பிக்கப்பட்டது!";
+    }
+}
+
 $envFilePath = dirname(__DIR__) . '/.env';
 $envBakPath = dirname(__DIR__) . '/.env.bak';
 
@@ -454,6 +478,9 @@ $activeTab = $_GET['tab'] ?? 'overview';
             <a href="?tab=env" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'env' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
                 <i data-lucide="file-code" class="w-4 h-4"></i> .env File Editor
             </a>
+            <a href="?tab=support" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'support' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
+                <i data-lucide="life-buoy" class="w-4 h-4"></i> ஆதரவு டிக்கெட்டுகள் (Support)
+            </a>
         </nav>
 
         <!-- Sidebar Footer -->
@@ -481,6 +508,7 @@ $activeTab = $_GET['tab'] ?? 'overview';
                     elseif ($activeTab === 'wallet') echo '💰 வாலட் பரிவர்த்தனைகள் (Wallet & Ledger)';
                     elseif ($activeTab === 'agora') echo '⚙️ Agora RTC & சிஸ்டம் அமைப்புகள்';
                     elseif ($activeTab === 'env') echo '📝 .env கோப்பு கட்டமைப்பு & திருத்தி (.env Editor)';
+                    elseif ($activeTab === 'support') echo '🎫 வாடிக்கையாளர் ஆதரவு டிக்கெட்டுகள் (Customer Support Tickets)';
                     ?>
                 </h2>
             </div>
@@ -1086,6 +1114,120 @@ $activeTab = $_GET['tab'] ?? 'overview';
                     }
                 }
             </script>
+            <?php endif; ?>
+
+            <!-- ============================================== -->
+            <!-- TAB 7: CUSTOMER SUPPORT TICKETS (SAGETALKZ WORKFLOW 8) -->
+            <!-- ============================================== -->
+            <?php if ($activeTab === 'support'): 
+                $tickets = $db->query("SELECT t.*, 
+                    (SELECT COUNT(*) FROM support_ticket_messages WHERE ticket_id = t.id) as msg_count 
+                    FROM support_tickets t ORDER BY t.id DESC")->fetchAll();
+                
+                $totalTickets = count($tickets);
+                $waitingCount = count(array_filter($tickets, fn($t) => ($t['status'] ?? '') === 'WAITING'));
+                $openCount = count(array_filter($tickets, fn($t) => ($t['status'] ?? '') === 'OPEN'));
+                $closedCount = count(array_filter($tickets, fn($t) => ($t['status'] ?? '') === 'CLOSED'));
+            ?>
+            <div class="space-y-6">
+                <!-- Support Metrics Bar -->
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div class="glass-card p-5 rounded-2xl border border-astro-border">
+                        <span class="text-white/60 text-xs font-semibold">மொத்த டிக்கெட்டுகள் (Total)</span>
+                        <div class="text-2xl font-bold font-cinzel text-white mt-1"><?= $totalTickets ?></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-blue-500/40 bg-blue-500/10">
+                        <span class="text-blue-300 text-xs font-semibold">காத்திருப்பில் (WAITING)</span>
+                        <div class="text-2xl font-bold font-cinzel text-blue-400 mt-1"><?= $waitingCount ?></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10">
+                        <span class="text-emerald-300 text-xs font-semibold">செயலில் / தீர்வு (OPEN)</span>
+                        <div class="text-2xl font-bold font-cinzel text-emerald-400 mt-1"><?= $openCount ?></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-red-500/40 bg-red-500/10">
+                        <span class="text-red-300 text-xs font-semibold">முடிக்கப்பட்டது (CLOSED)</span>
+                        <div class="text-2xl font-bold font-cinzel text-red-400 mt-1"><?= $closedCount ?></div>
+                    </div>
+                </div>
+
+                <!-- Tickets List -->
+                <div class="space-y-4">
+                    <?php if (empty($tickets)): ?>
+                        <div class="glass-card p-12 text-center text-white/50 rounded-2xl">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 opacity-40"></i>
+                            தற்போது எந்த ஆதரவு டிக்கெட்டுகளும் இல்லை (No support tickets found).
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($tickets as $t): 
+                            $tId = (int)$t['id'];
+                            $status = $t['status'] ?? 'WAITING';
+                            $statusBadgeClass = ($status === 'OPEN') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
+                                               (($status === 'WAITING') ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' :
+                                                'bg-red-500/20 text-red-400 border-red-500/40');
+                            
+                            $tMsgs = $db->prepare("SELECT * FROM support_ticket_messages WHERE ticket_id = ? ORDER BY id ASC");
+                            $tMsgs->execute([$tId]);
+                            $allMsgs = $tMsgs->fetchAll();
+                        ?>
+                        <div class="glass-card p-6 rounded-2xl border border-astro-border space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-astro-border pb-3">
+                                <div class="flex items-center gap-3">
+                                    <span class="px-2.5 py-1 rounded-lg bg-astro-card border border-astro-gold/40 text-astro-gold font-mono text-xs font-bold">
+                                        <?= htmlspecialchars($t['ticket_number'] ?? '#TKT') ?>
+                                    </span>
+                                    <span class="text-sm font-bold text-white"><?= htmlspecialchars($t['subject'] ?? '') ?></span>
+                                    <span class="text-xs text-astro-textMint">(<?= htmlspecialchars($t['category'] ?? '') ?>)</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold border <?= $statusBadgeClass ?>">
+                                        <?= htmlspecialchars($status) ?>
+                                    </span>
+                                    <span class="text-xs text-white/50"><?= htmlspecialchars($t['created_at'] ?? '') ?></span>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-white/80 leading-relaxed bg-astro-surface p-3.5 rounded-xl border border-astro-border">
+                                💬 <b>பயனர் கோரிக்கை:</b> <?= nl2br(htmlspecialchars($t['description'] ?? '')) ?>
+                                <br><span class="text-white/40 text-[11px] mt-1 inline-block">மொபைல்: +91 <?= htmlspecialchars($t['user_phone'] ?? '') ?></span>
+                            </p>
+
+                            <!-- Conversation Messages -->
+                            <?php if (!empty($allMsgs)): ?>
+                            <div class="space-y-2 max-h-48 overflow-y-auto p-2 bg-astro-base/50 rounded-xl border border-astro-border/50 text-xs">
+                                <?php foreach ($allMsgs as $m): 
+                                    $isUser = ($m['sender_type'] ?? '') === 'user';
+                                ?>
+                                <div class="p-2.5 rounded-lg <?= $isUser ? 'bg-astro-surface ml-4 border-l-2 border-astro-gold' : 'bg-astro-card mr-4 border-l-2 border-emerald-400' ?>">
+                                    <div class="flex items-center justify-between text-[11px] font-bold text-astro-gold mb-1">
+                                        <span><?= htmlspecialchars($m['sender_name'] ?? 'Desk') ?> (<?= htmlspecialchars($m['sender_type'] ?? '') ?>)</span>
+                                        <span class="text-white/40 font-normal"><?= htmlspecialchars($m['created_at'] ?? '') ?></span>
+                                    </div>
+                                    <p class="text-white/90 text-[12px]"><?= nl2br(htmlspecialchars($m['message'] ?? '')) ?></p>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+
+                            <!-- Admin Reply & Status Update Form -->
+                            <form method="POST" action="index.php?tab=support" class="flex flex-wrap items-center gap-3 pt-2">
+                                <input type="hidden" name="ticket_id" value="<?= $tId ?>">
+                                <div class="flex-1 min-w-[240px]">
+                                    <input type="text" name="reply_message" placeholder="பயனருக்கு பதில் செய்தி அனுப்பவும் (Reply to user)..." class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-xs text-white focus:border-astro-gold focus:outline-none">
+                                </div>
+                                <select name="ticket_status" class="bg-astro-base border border-astro-border rounded-xl p-2.5 text-xs text-white focus:border-astro-gold focus:outline-none">
+                                    <option value="WAITING" <?= $status === 'WAITING' ? 'selected' : '' ?>>🔵 WAITING</option>
+                                    <option value="OPEN" <?= $status === 'OPEN' ? 'selected' : '' ?>>🟢 OPEN</option>
+                                    <option value="CLOSED" <?= $status === 'CLOSED' ? 'selected' : '' ?>>🔴 CLOSED</option>
+                                </select>
+                                <button type="submit" name="admin_ticket_reply" class="btn-gold px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i> பதில் & புதுப்பி (Send & Update)
+                                </button>
+                            </form>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
             <?php endif; ?>
 
         </main>

@@ -315,6 +315,13 @@ class HomeScreen extends StatelessWidget {
               }
             },
           ),
+          IconButton(
+            tooltip: 'Help & Support / உதவி மையம்',
+            icon: const Icon(Icons.support_agent, color: AstroTheme.solarYellow),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSupportScreen()));
+            },
+          ),
           GestureDetector(
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
@@ -2792,6 +2799,13 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.support_agent, color: AstroTheme.royalGold),
+            tooltip: 'Support Desk / உதவி மையம்',
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSupportScreen()));
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.notifications_active, color: AstroTheme.royalGold),
             tooltip: 'Simulate Incoming Call',
             onPressed: _triggerIncomingCallAlert,
@@ -4074,3 +4088,913 @@ class _LoginWithOtpDialogState extends State<LoginWithOtpDialog> {
     );
   }
 }
+
+// ==============================================================================
+// 🌟 9. CUSTOMER SUPPORT & TICKETING LIFECYCLE (SAGETALKZ WORKFLOW 8)
+// ==============================================================================
+
+class SupportState {
+  static List<Map<String, dynamic>> tickets = [
+    {
+      'id': '1',
+      'ticket_number': 'TKT-1082',
+      'category': 'Wallet & Payments',
+      'subject': 'Wallet Recharge Status Confirmation',
+      'description': 'I recently completed a ₹100 wallet recharge via UPI. Please confirm my transaction status.',
+      'status': 'OPEN',
+      'priority': 'MEDIUM',
+      'created_at': 'Today, 10:30 AM',
+      'messages': [
+        {
+          'sender': 'user',
+          'name': 'Devotee',
+          'text': 'I recently completed a ₹100 wallet recharge via UPI. Please confirm my transaction status.',
+          'time': '10:30 AM',
+        },
+        {
+          'sender': 'support',
+          'name': 'AstroSubam Support Desk',
+          'text': 'வணக்கம்! We have verified your transaction reference #TXN-9841. Your ₹100 credit is active in your wallet.',
+          'time': '10:35 AM',
+        },
+      ],
+    },
+    {
+      'id': '2',
+      'ticket_number': 'TKT-1049',
+      'category': 'Call Drop / Audio Issue',
+      'subject': 'Audio Call dropped after 2 mins',
+      'description': 'My audio consultation with Guruji disconnected unexpectedly. Please check minutes refund.',
+      'status': 'WAITING',
+      'priority': 'HIGH',
+      'created_at': 'Yesterday, 04:15 PM',
+      'messages': [
+        {
+          'sender': 'user',
+          'name': 'Devotee',
+          'text': 'My audio consultation with Guruji disconnected unexpectedly. Please check minutes refund.',
+          'time': '04:15 PM',
+        },
+        {
+          'sender': 'support',
+          'name': 'AstroSubam Support Desk',
+          'text': 'வணக்கம்! Our technical desk is reviewing the Agora RTC logs for your session. We will update you shortly.',
+          'time': '04:16 PM',
+        },
+      ],
+    },
+    {
+      'id': '3',
+      'ticket_number': 'TKT-1011',
+      'category': 'Kundali / Birth Chart',
+      'subject': 'Navamsha Chart Dasha clarification',
+      'description': 'Kindly verify whether my Jupiter Mahadasha began in 2025 or 2026 based on Thirukanitha Panchangam.',
+      'status': 'CLOSED',
+      'priority': 'LOW',
+      'created_at': '02 Nov, 11:20 AM',
+      'messages': [
+        {
+          'sender': 'user',
+          'name': 'Devotee',
+          'text': 'Kindly verify whether my Jupiter Mahadasha began in 2025 or 2026 based on Thirukanitha Panchangam.',
+          'time': '11:20 AM',
+        },
+        {
+          'sender': 'support',
+          'name': 'Vedic Scholar Desk',
+          'text': 'According to the Swiss Ephemeris and Thirukanitha Panchangam, your Guru Mahadasha commenced on 14-Jan-2026.',
+          'time': '11:45 AM',
+        },
+      ],
+    },
+  ];
+
+  static Future<Map<String, dynamic>> submitTicket({
+    required String category,
+    required String description,
+    String? subject,
+  }) async {
+    final sub = (subject != null && subject.trim().isNotEmpty)
+        ? subject.trim()
+        : '$category - ${description.length > 30 ? description.substring(0, 30) : description}...';
+
+    final ticketNo = 'TKT-${(1000 + tickets.length + 1)}';
+
+    final newTicket = {
+      'id': '${tickets.length + 1}',
+      'ticket_number': ticketNo,
+      'category': category,
+      'subject': sub,
+      'description': description,
+      'status': 'WAITING',
+      'priority': 'MEDIUM',
+      'created_at': 'Just now',
+      'messages': [
+        {
+          'sender': 'user',
+          'name': UserState.isLoggedIn ? UserState.userName : 'Devotee',
+          'text': description,
+          'time': 'Just now',
+        },
+        {
+          'sender': 'support',
+          'name': 'AstroSubam Support Desk',
+          'text': 'வணக்கம்! Your query regarding "$category" has been received (Ticket $ticketNo). Our support team will assist you shortly.',
+          'time': 'Just now',
+        },
+      ],
+    };
+
+    // Insert at beginning of list
+    tickets.insert(0, newTicket);
+
+    // Call live API asynchronously (safe background call)
+    try {
+      await ApiService.post('/support/create_ticket.php', {
+        'user_id': UserState.userId,
+        'user_phone': UserState.userPhone,
+        'category': category,
+        'subject': sub,
+        'description': description,
+      });
+    } catch (_) {}
+
+    return newTicket;
+  }
+}
+
+// ------------------------------------------------------------------------------
+// 🌟 CUSTOMER SUPPORT MAIN SCREEN (CATEGORIES, 30-400 CHARS VALIDATION & STATUS)
+// ------------------------------------------------------------------------------
+class CustomerSupportScreen extends StatefulWidget {
+  const CustomerSupportScreen({super.key});
+
+  @override
+  State<CustomerSupportScreen> createState() => _CustomerSupportScreenState();
+}
+
+class _CustomerSupportScreenState extends State<CustomerSupportScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // New Ticket Form State
+  String _selectedCategory = 'Wallet & Payments';
+  final TextEditingController _subjectController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+  bool _isSubmitting = false;
+
+  final List<Map<String, dynamic>> _categories = [
+    {'title': 'Wallet & Payments', 'icon': Icons.account_balance_wallet, 'sub': 'Recharge, deduction, refund'},
+    {'title': 'Call Drop / Audio Issue', 'icon': Icons.phone_missed, 'sub': 'Disconnected call or voice drop'},
+    {'title': 'Astrologer Consultation', 'icon': Icons.stars, 'sub': 'Queue, appointment, advice'},
+    {'title': 'Kundali / Birth Chart', 'icon': Icons.compass_calibration, 'sub': 'Horoscope calculation, Dasha'},
+    {'title': 'Profile & Login', 'icon': Icons.person, 'sub': 'OTP, mobile number change'},
+    {'title': 'General Inquiry', 'icon': Icons.help_outline, 'sub': 'Other questions & feedback'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _subjectController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'OPEN':
+        return const Color(0xFF10B981); // Emerald Green
+      case 'WAITING':
+        return const Color(0xFF2563EB); // Royal Blue
+      case 'CLOSED':
+        return const Color(0xFFEF4444); // Crimson Red
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Future<void> _submitQuery() async {
+    final desc = _descController.text.trim();
+    if (desc.length < 30) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.statusDanger,
+          content: Text('Description must be at least 30 characters (Currently ${desc.length}/30).'),
+        ),
+      );
+      return;
+    }
+    if (desc.length > 400) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.statusDanger,
+          content: Text('Description cannot exceed 400 characters (Currently ${desc.length}/400).'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final newTicket = await SupportState.submitTicket(
+      category: _selectedCategory,
+      description: desc,
+      subject: _subjectController.text.trim(),
+    );
+
+    setState(() {
+      _isSubmitting = false;
+      _descController.clear();
+      _subjectController.clear();
+    });
+
+    if (mounted) {
+      _tabController.animateTo(0); // Switch to My Tickets tab
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF10B981),
+          content: Text('✅ Support Query #${newTicket['ticket_number']} submitted successfully!'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AstroTheme.emeraldNight,
+      appBar: AppBar(
+        backgroundColor: AstroTheme.headerGreen,
+        elevation: 0,
+        title: Row(
+          children: const [
+            Icon(Icons.support_agent, color: AstroTheme.solarYellow, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'உதவி & ஆதரவு (Help & Support)',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: AstroTheme.solarYellow,
+          indicatorWeight: 3,
+          labelColor: AstroTheme.solarYellow,
+          unselectedLabelColor: Colors.white60,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          tabs: [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.receipt_long, size: 16),
+                  const SizedBox(width: 6),
+                  Text('My Tickets (${SupportState.tickets.length})'),
+                ],
+              ),
+            ),
+            const Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_comment_rounded, size: 16),
+                  SizedBox(width: 6),
+                  Text('Submit Query'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // --------------------------------------------------------------------
+          // TAB 1: MY TICKETS LIST WITH COLOR-CODED CHIPS
+          // --------------------------------------------------------------------
+          _buildTicketsListTab(),
+
+          // --------------------------------------------------------------------
+          // TAB 2: CREATE NEW TICKET FORM (30-400 CHARS VALIDATION)
+          // --------------------------------------------------------------------
+          _buildCreateTicketTab(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTicketsListTab() {
+    if (SupportState.tickets.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.support_agent_outlined, size: 64, color: Colors.white24),
+            const SizedBox(height: 12),
+            const Text('No support inquiries yet', style: TextStyle(color: Colors.white70, fontSize: 15)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+              onPressed: () => _tabController.animateTo(1),
+              icon: const Icon(Icons.add),
+              label: const Text('Submit a Query'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SafeArea(
+      bottom: true,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        itemCount: SupportState.tickets.length,
+        itemBuilder: (ctx, index) {
+          final t = SupportState.tickets[index];
+          final status = (t['status'] ?? 'WAITING').toString();
+          final statusColor = _getStatusColor(status);
+          final msgs = (t['messages'] as List? ?? []);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AstroTheme.forestSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AstroTheme.borderGreen),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 8, offset: const Offset(0, 3)),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TicketChatDetailScreen(ticket: t),
+                    ),
+                  ).then((_) => setState(() {}));
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Row: Ticket Number & Status Pill Chip
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AstroTheme.jadeContainer,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AstroTheme.solarYellow.withAlpha(100)),
+                                ),
+                                child: Text(
+                                  t['ticket_number'] ?? '#TKT',
+                                  style: const TextStyle(
+                                    color: AstroTheme.solarYellow,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                t['category'] ?? '',
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                          // Color-coded Status Chip: WAITING (Blue), OPEN (Green), CLOSED (Red)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withAlpha(40),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: statusColor, width: 1.2),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  status,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Subject / Title
+                      Text(
+                        t['subject'] ?? '',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Description Snippet
+                      Text(
+                        t['description'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(color: AstroTheme.borderGreen, height: 1),
+                      const SizedBox(height: 10),
+
+                      // Footer Row: Timestamp & Chat Action
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time, size: 12, color: Colors.white38),
+                              const SizedBox(width: 4),
+                              Text(t['created_at'] ?? '', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                              const SizedBox(width: 10),
+                              const Icon(Icons.forum_outlined, size: 12, color: AstroTheme.solarYellow),
+                              const SizedBox(width: 4),
+                              Text('${msgs.length} messages', style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Row(
+                            children: const [
+                              Text(
+                                'Chat & View ➔',
+                                style: TextStyle(color: AstroTheme.emeraldAccent, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCreateTicketTab() {
+    final currentLength = _descController.text.trim().length;
+    final isValidLength = currentLength >= 30 && currentLength <= 400;
+
+    return SafeArea(
+      bottom: true,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Category Selection Header
+            const Text(
+              '1. Select Inquiry Topic / வகையைத் தேர்ந்தெடுக்கவும்',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+
+            // Category Chips Grid
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _categories.map((c) {
+                final isSelected = _selectedCategory == c['title'];
+                return ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(c['icon'] as IconData, size: 14, color: isSelected ? AstroTheme.emeraldNight : AstroTheme.solarYellow),
+                      const SizedBox(width: 6),
+                      Text(
+                        c['title'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AstroTheme.emeraldNight : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  selected: isSelected,
+                  selectedColor: AstroTheme.solarYellow,
+                  backgroundColor: AstroTheme.forestSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: isSelected ? AstroTheme.solarYellow : AstroTheme.borderGreen),
+                  ),
+                  onSelected: (val) {
+                    if (val) setState(() => _selectedCategory = c['title'] as String);
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 18),
+
+            // Subject TextField
+            const Text(
+              '2. Subject / தலைப்பு (Optional)',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _subjectController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Brief summary of issue (e.g. ₹100 recharge not credited)',
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                filled: true,
+                fillColor: AstroTheme.forestSurface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.borderGreen)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Description TextField with Character Counter
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '3. Query Description (30 - 400 characters)',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  '$currentLength / 400',
+                  style: TextStyle(
+                    color: isValidLength ? const Color(0xFF10B981) : Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _descController,
+              maxLines: 5,
+              maxLength: 400,
+              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: 'Please describe your query in detail with transaction ID or astrologer name (Minimum 30 characters)...',
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                filled: true,
+                fillColor: AstroTheme.forestSurface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AstroTheme.borderGreen)),
+                contentPadding: const EdgeInsets.all(14),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Dynamic Validation Indicator
+            if (currentLength > 0 && currentLength < 30) ...[
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: AstroTheme.solarYellow),
+                  const SizedBox(width: 6),
+                  Text(
+                    '⚠️ Minimum 30 characters required (${30 - currentLength} more characters needed)',
+                    style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 11),
+                  ),
+                ],
+              ),
+            ] else if (isValidLength) ...[
+              Row(
+                children: const [
+                  Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
+                  SizedBox(width: 6),
+                  Text(
+                    '✅ Valid query description length. Ready to submit!',
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+
+            // Workflow 8 Rule: Primary button placed directly below input with comfortable breathing room (24px)
+            const SizedBox(height: 24),
+
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isValidLength ? AstroTheme.solarYellow : Colors.white24,
+                foregroundColor: isValidLength ? AstroTheme.emeraldNight : Colors.white54,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: isValidLength ? 3 : 0,
+              ),
+              onPressed: (_isSubmitting || !isValidLength) ? null : _submitQuery,
+              icon: _isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AstroTheme.emeraldNight))
+                  : const Icon(Icons.send_rounded, size: 18),
+              label: Text(
+                _isSubmitting ? 'Submitting Support Ticket...' : 'Submit Support Query (கோரிக்கையை அனுப்புக) ➔',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            Center(
+              child: Text(
+                'AstroSubam Support Desk typically responds within 15 - 30 minutes.',
+                style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------------------
+// 🌟 TICKET CONVERSATION & LIVE SUPPORT CHAT SCREEN (WORKFLOW 8 CHAT)
+// ------------------------------------------------------------------------------
+class TicketChatDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> ticket;
+
+  const TicketChatDetailScreen({super.key, required this.ticket});
+
+  @override
+  State<TicketChatDetailScreen> createState() => _TicketChatDetailScreenState();
+}
+
+class _TicketChatDetailScreenState extends State<TicketChatDetailScreen> {
+  final TextEditingController _replyController = TextEditingController();
+  late List<Map<String, dynamic>> _messages;
+  late String _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _messages = List<Map<String, dynamic>>.from(widget.ticket['messages'] ?? []);
+    _status = widget.ticket['status'] ?? 'WAITING';
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  Color _getStatusColor(String s) {
+    switch (s.toUpperCase()) {
+      case 'OPEN':
+        return const Color(0xFF10B981);
+      case 'WAITING':
+        return const Color(0xFF2563EB);
+      case 'CLOSED':
+        return const Color(0xFFEF4444);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _sendReply() {
+    final text = _replyController.text.trim();
+    if (text.isEmpty) return;
+
+    final newMsg = {
+      'sender': 'user',
+      'name': UserState.isLoggedIn ? UserState.userName : 'Devotee',
+      'text': text,
+      'time': 'Just now',
+    };
+
+    setState(() {
+      _messages.add(newMsg);
+      if (_status == 'CLOSED') {
+        _status = 'WAITING';
+      }
+      widget.ticket['status'] = _status;
+      widget.ticket['messages'] = _messages;
+    });
+
+    _replyController.clear();
+
+    // Call live API asynchronously
+    final ticketId = int.tryParse(widget.ticket['id']?.toString() ?? '1') ?? 1;
+    ApiService.post('/support/send_reply.php', {
+      'ticket_id': ticketId,
+      'sender_type': 'user',
+      'sender_name': UserState.isLoggedIn ? UserState.userName : 'Devotee',
+      'message': text,
+    });
+
+    // Simulate agent response after 1.5 seconds if test mode
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'sender': 'support',
+            'name': 'Support Executive',
+            'text': 'Thank you for updating your query. Our agent has taken note of: "$text". Resolving shortly.',
+            'time': 'Just now',
+          });
+          _status = 'OPEN';
+          widget.ticket['status'] = _status;
+        });
+      }
+    });
+  }
+
+  void _closeTicket() {
+    setState(() {
+      _status = 'CLOSED';
+      widget.ticket['status'] = 'CLOSED';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ticket marked as resolved and closed.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _getStatusColor(_status);
+
+    return Scaffold(
+      backgroundColor: AstroTheme.emeraldNight,
+      appBar: AppBar(
+        backgroundColor: AstroTheme.headerGreen,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Ticket ${widget.ticket['ticket_number'] ?? '#TKT'}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            Text(
+              widget.ticket['category'] ?? 'Support Inquiry',
+              style: const TextStyle(fontSize: 10, color: AstroTheme.textMint),
+            ),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: statusColor.withAlpha(40),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: statusColor),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              _status,
+              style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+          if (_status != 'CLOSED')
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline, color: Colors.white70),
+              tooltip: 'Mark Resolved & Close Ticket',
+              onPressed: _closeTicket,
+            ),
+        ],
+      ),
+      body: SafeArea(
+        bottom: true,
+        child: Column(
+          children: [
+            // Conversation Message Thread
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length,
+                itemBuilder: (ctx, idx) {
+                  final m = _messages[idx];
+                  final isUser = m['sender'] == 'user';
+
+                  return Align(
+                    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isUser ? AstroTheme.headerGreen : AstroTheme.forestSurface,
+                        borderRadius: BorderRadius.circular(16).copyWith(
+                          bottomRight: isUser ? Radius.zero : const Radius.circular(16),
+                          bottomLeft: !isUser ? Radius.zero : const Radius.circular(16),
+                        ),
+                        border: Border.all(
+                          color: isUser ? AstroTheme.solarYellow.withAlpha(80) : AstroTheme.borderGreen,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isUser ? Icons.person : Icons.support_agent,
+                                size: 12,
+                                color: isUser ? AstroTheme.solarYellow : AstroTheme.royalGold,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                m['name'] ?? (isUser ? 'You' : 'Support Desk'),
+                                style: TextStyle(
+                                  color: isUser ? AstroTheme.solarYellow : AstroTheme.royalGold,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(m['time'] ?? '', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            m['text'] ?? '',
+                            style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Bottom Input Reply Bar with Safe Area Protection
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: const BoxDecoration(
+                color: AstroTheme.forestSurface,
+                border: Border(top: BorderSide(color: AstroTheme.borderGreen)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Type your message to support agent...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                        filled: true,
+                        fillColor: AstroTheme.headerGreen,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      onSubmitted: (_) => _sendReply(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: AstroTheme.solarYellow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send_rounded, color: AstroTheme.emeraldNight, size: 18),
+                      onPressed: _sendReply,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

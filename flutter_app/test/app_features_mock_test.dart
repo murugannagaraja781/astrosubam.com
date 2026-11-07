@@ -339,5 +339,103 @@ void main() {
       expect(find.text('Lagna Kundali (துலாம்)'), findsOneWidget);
       expect(find.text('ராசி'), findsWidgets);
     });
+
+    // -------------------------------------------------------------------------
+    // TEST 7: SAGETALKZ WORKFLOW 8 - CUSTOMER SUPPORT & TICKETING LIFECYCLE
+    // -------------------------------------------------------------------------
+    testWidgets('7. Test SageTalkz Workflow 8 Customer Support & Ticketing Lifecycle', (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: CustomerSupportScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      // 1. Verify Support Screen Header & Tabs
+      expect(find.textContaining('Help & Support'), findsOneWidget);
+      expect(find.textContaining('My Tickets'), findsOneWidget);
+      expect(find.textContaining('Submit Query'), findsOneWidget);
+
+      // 2. Verify Color-Coded Status Chips in Ticket List
+      expect(find.text('OPEN'), findsOneWidget);     // Green Chip (TKT-1082)
+      expect(find.text('WAITING'), findsOneWidget);  // Blue Chip (TKT-1049)
+      expect(find.text('CLOSED'), findsOneWidget);   // Red Chip (TKT-1011)
+
+      // 3. Test Ticket Detail & Live Support Chat
+      final ticketCard = find.text('TKT-1082');
+      expect(ticketCard, findsOneWidget);
+      await tester.tap(ticketCard);
+      await tester.pumpAndSettle();
+
+      // Verify Ticket Chat Screen Opened
+      expect(find.text('Ticket TKT-1082'), findsOneWidget);
+      expect(find.textContaining('Wallet & Payments'), findsWidgets);
+      expect(find.textContaining('AstroSubam Support Desk'), findsOneWidget);
+
+      // Send a follow-up reply message
+      final replyField = find.byType(TextField);
+      expect(replyField, findsOneWidget);
+      await tester.enterText(replyField, 'Thank you, the amount has been credited now.');
+      await tester.pumpAndSettle();
+
+      final sendBtn = find.byIcon(Icons.send_rounded);
+      expect(sendBtn, findsOneWidget);
+      await tester.tap(sendBtn);
+      await tester.pumpAndSettle();
+
+      // Verify user message appeared in thread
+      expect(find.text('Thank you, the amount has been credited now.'), findsOneWidget);
+
+      // Go back to Support main screen
+      final backBtn = find.byTooltip('Back');
+      if (backBtn.evaluate().isNotEmpty) {
+        await tester.tap(backBtn);
+      } else {
+        await tester.pageBack();
+      }
+      await tester.pumpAndSettle();
+
+      // 4. Test Ticket Creation Form with 30-400 Char Validation
+      final submitTab = find.textContaining('Submit Query');
+      await tester.tap(submitTab);
+      await tester.pumpAndSettle();
+
+      // Verify Category selector chips
+      expect(find.text('Call Drop / Audio Issue'), findsOneWidget);
+      expect(find.text('Astrologer Consultation'), findsOneWidget);
+
+      // Select "Call Drop / Audio Issue" category
+      await tester.tap(find.text('Call Drop / Audio Issue'));
+      await tester.pumpAndSettle();
+
+      // Find description input field (second TextField in form)
+      final formFields = find.byType(TextField);
+      final descField = formFields.last;
+
+      // Enter short description (< 30 characters) to test validation
+      await tester.enterText(descField, 'Audio call failed.');
+      await tester.pumpAndSettle();
+
+      // Verify minimum 30 chars warning indicator
+      expect(find.textContaining('Minimum 30 characters required'), findsOneWidget);
+
+      // Now enter valid description (> 30 characters and < 400 characters)
+      const validQuery = 'My voice call with Guruji dropped after 2 minutes due to network glitch. Kindly refund my wallet balance.';
+      await tester.enterText(descField, validQuery);
+      await tester.pumpAndSettle();
+
+      // Verify valid validation indicator
+      expect(find.textContaining('Valid query description length'), findsOneWidget);
+
+      // Tap Submit Support Query button
+      final submitBtn = find.textContaining('Submit Support Query');
+      expect(submitBtn, findsOneWidget);
+      await tester.ensureVisible(submitBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      // Verify auto-switch back to My Tickets tab and new ticket is listed
+      expect(find.textContaining('My Tickets'), findsOneWidget);
+      expect(find.text(validQuery), findsOneWidget);
+    });
   });
 }

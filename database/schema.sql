@@ -94,3 +94,33 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
     `description` VARCHAR(255) NULL,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- 7. Support Tickets Table (SageTalkz Workflow 8)
+CREATE TABLE IF NOT EXISTS `support_tickets` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `ticket_number` VARCHAR(32) UNIQUE NOT NULL,
+    `user_id` INT NOT NULL,
+    `user_phone` VARCHAR(20) NOT NULL,
+    `category` VARCHAR(100) NOT NULL,
+    `subject` VARCHAR(255) NOT NULL,
+    `description` TEXT NOT NULL,
+    `status` ENUM('WAITING', 'OPEN', 'CLOSED') DEFAULT 'WAITING',
+    `priority` ENUM('LOW', 'MEDIUM', 'HIGH') DEFAULT 'MEDIUM',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX (`user_id`),
+    INDEX (`status`)
+) ENGINE=InnoDB;
+
+-- 8. Support Ticket Messages Table (Live Support Conversation)
+CREATE TABLE IF NOT EXISTS `support_ticket_messages` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id` INT NOT NULL,
+    `sender_type` ENUM('user', 'support', 'admin') NOT NULL,
+    `sender_name` VARCHAR(120) NOT NULL,
+    `message` TEXT NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (`ticket_id`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `support_tickets`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
