@@ -34,3 +34,4 @@ Response::json(true, 'Ticket details retrieved successfully.', [
     'ticket'   => $ticket,
     'messages' => $messages
 ]);
+

@@ -38,7 +38,7 @@ try {
     // If balance is less than 1 minute rate, terminate call
     if ($currentBalance < $rate) {
         // End the session
-        $db->prepare("UPDATE consultation_sessions SET status = 'completed', end_time = NOW() WHERE id = ?")->execute([$session['id']]);
+        $db->prepare("UPDATE consultation_sessions SET status = 'completed', end_time = CURRENT_TIMESTAMP WHERE id = ?")->execute([$session['id']]);
         $db->prepare("UPDATE astrologers SET call_status = 'available' WHERE id = ?")->execute([$session['astrologer_id']]);
         $db->commit();
 

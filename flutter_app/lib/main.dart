@@ -33,6 +33,25 @@ class ApiService {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
+
+  static Future<Map<String, dynamic>> get(String endpoint) async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      client.badCertificateCallback = (cert, host, port) => true;
+
+      final request = await client.getUrl(Uri.parse('$baseUrl$endpoint'));
+      request.headers.set('User-Agent', 'AstroSubamApp/1.0');
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+      client.close();
+
+      return jsonDecode(responseBody) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
 }
 
 // ==============================================================================
@@ -204,6 +223,8 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  Timer? _incomingCheckTimer;
+  bool _isIncomingCallShowing = false;
 
   final List<Widget> _pages = [
     const HomeScreen(),
@@ -211,6 +232,95 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const DailyKundliScreen(),
     const WalletScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startIncomingCallListener();
+  }
+
+  @override
+  void dispose() {
+    _incomingCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startIncomingCallListener() {
+    _incomingCheckTimer = Timer.periodic(const Duration(seconds: 3), (t) async {
+      if (!mounted || _isIncomingCallShowing || !UserState.isLoggedIn) return;
+
+      try {
+        final res = await ApiService.get('/sessions/user_pending.php?user_id=${UserState.userId}');
+        if (!mounted) return;
+
+        if (res['ok'] == true && res['data'] != null && res['data']['has_incoming'] == true) {
+          final session = res['data']['session'];
+          final astroData = session['astrologer'] ?? {};
+          final astroMap = {
+            'id': astroData['id'] ?? 1,
+            'name': astroData['name'] ?? 'Guruji S. Sundaramurthy',
+            'speciality': astroData['specialities'] ?? 'Vedic Astrology',
+            'image': astroData['avatar'] ?? 'assets/logo.jpg',
+          };
+
+          _isIncomingCallShowing = true;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenIncomingCallScreen(
+                astrologer: astroMap,
+                sessionId: session['session_id'],
+                channelName: session['channel_name'] ?? '',
+                type: session['type'] ?? 'audio',
+                ratePerMin: (session['rate_per_min'] as num?)?.toDouble() ?? 20.0,
+                onConnected: (roomData) {
+                  _isIncomingCallShowing = false;
+                  final sessionId = roomData['session_id']?.toString() ?? '';
+                  final channelName = roomData['channel_name']?.toString() ?? '';
+                  final agoraToken = roomData['agora_user_token']?.toString() ?? (roomData['agora_token']?.toString() ?? '');
+
+                  if ((session['type'] ?? '') == 'chat') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LiveChatConsultationScreen(
+                          astrologer: astroMap,
+                          ratePerMin: (session['rate_per_min'] as num?)?.toDouble() ?? 20.0,
+                          sessionId: sessionId,
+                          channelName: channelName,
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LiveAgoraCallScreen(
+                          astrologer: astroMap,
+                          ratePerMin: (session['rate_per_min'] as num?)?.toDouble() ?? 20.0,
+                          isVideo: (session['type'] ?? '') == 'video',
+                          sessionId: sessionId,
+                          channelName: channelName,
+                          agoraToken: agoraToken,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                onDeclined: () {
+                  _isIncomingCallShowing = false;
+                },
+              ),
+            ),
+          ).then((_) {
+            _isIncomingCallShowing = false;
+          });
+        }
+      } catch (e) {
+        // silent polling catch
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -674,28 +784,705 @@ class AstrologerCard extends StatelessWidget {
       return;
     }
 
-    if (type == 'chat') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LiveChatConsultationScreen(
-            astrologer: astrologer,
-            ratePerMin: ratePerMin,
-          ),
+    // Real End-to-End Consultation Flow:
+    // 1. Show Outgoing Ringing Dialog with 30s countdown
+    // 2. Poll server for Astrologer acceptance
+    // 3. On accept, instantly navigate to full-screen Agora Call / Chat room
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => OutgoingCallingDialog(
+        astrologer: astrologer,
+        type: type,
+        ratePerMin: ratePerMin,
+        onAccepted: (data) {
+          final sessionId = data['session_id']?.toString() ?? '';
+          final channelName = data['channel_name']?.toString() ?? '';
+          final agoraToken = data['agora_user_token']?.toString() ?? (data['agora_token']?.toString() ?? '');
+
+          if (type == 'chat') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LiveChatConsultationScreen(
+                  astrologer: astrologer,
+                  ratePerMin: ratePerMin,
+                  sessionId: sessionId,
+                  channelName: channelName,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LiveAgoraCallScreen(
+                  astrologer: astrologer,
+                  ratePerMin: ratePerMin,
+                  isVideo: type == 'video',
+                  sessionId: sessionId,
+                  channelName: channelName,
+                  agoraToken: agoraToken,
+                ),
+              ),
+            );
+          }
+        },
+        onDeclined: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AstroTheme.forestSurface,
+              content: Text('Astrologer is currently busy or declined the request. Please try again.',
+                  style: TextStyle(color: AstroTheme.solarYellow)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 OUTGOING CALLING DIALOG (DEVOTEE RINGING SCREEN - 30S COUNTDOWN & POLLING)
+// ==============================================================================
+class OutgoingCallingDialog extends StatefulWidget {
+  final Map<String, dynamic> astrologer;
+  final String type; // 'audio', 'video', 'chat'
+  final double ratePerMin;
+  final Function(Map<String, dynamic> data) onAccepted;
+  final VoidCallback onDeclined;
+
+  const OutgoingCallingDialog({
+    super.key,
+    required this.astrologer,
+    required this.type,
+    required this.ratePerMin,
+    required this.onAccepted,
+    required this.onDeclined,
+  });
+
+  @override
+  State<OutgoingCallingDialog> createState() => _OutgoingCallingDialogState();
+}
+
+class _OutgoingCallingDialogState extends State<OutgoingCallingDialog> with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  int _secondsLeft = 30;
+  Timer? _countdownTimer;
+  Timer? _statusPollTimer;
+  String? _sessionId;
+  String _statusText = 'Connecting with Astrologer...';
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _initiateRequest();
+  }
+
+  Future<void> _initiateRequest() async {
+    final astroId = widget.astrologer['id'] ?? 1;
+    final res = await ApiService.post('/sessions/request.php', {
+      'user_id': UserState.userId,
+      'astrologer_id': astroId,
+      'type': widget.type,
+      'user_name': UserState.userName,
+      'user_phone': UserState.userPhone,
+    });
+
+    if (!mounted) return;
+
+    if (res['ok'] == true && res['data'] != null) {
+      setState(() {
+        _sessionId = res['data']['session_id'];
+        _statusText = 'Ringing Astrologer... Waiting to accept';
+      });
+      _startTimers();
+    } else {
+      final msg = res['message'] ?? 'Astrologer is currently unavailable.';
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: AstroTheme.forestSurface, content: Text(msg, style: const TextStyle(color: Colors.redAccent))),
+      );
+    }
+  }
+
+  void _startTimers() {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_secondsLeft > 1) {
+        setState(() => _secondsLeft--);
+      } else {
+        _cancelCall(timeout: true);
+      }
+    });
+
+    _statusPollTimer = Timer.periodic(const Duration(milliseconds: 1500), (t) async {
+      if (!mounted || _sessionId == null) return;
+      final checkRes = await ApiService.get('/sessions/check_status.php?session_id=$_sessionId');
+      if (!mounted) return;
+
+      if (checkRes['ok'] == true && checkRes['data'] != null) {
+        final status = checkRes['data']['status'];
+        if (status == 'ringing_user') {
+          // Astrologer accepted! Open Full-Screen Incoming Call Screen
+          _statusPollTimer?.cancel();
+          _countdownTimer?.cancel();
+          Navigator.pop(context); // Close OutgoingCallingDialog
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenIncomingCallScreen(
+                astrologer: widget.astrologer,
+                sessionId: _sessionId!,
+                channelName: checkRes['data']['channel_name'] ?? '',
+                type: widget.type,
+                ratePerMin: widget.ratePerMin,
+                onConnected: (roomData) {
+                  widget.onAccepted(roomData);
+                },
+                onDeclined: widget.onDeclined,
+              ),
+            ),
+          );
+        } else if (status == 'active') {
+          _statusPollTimer?.cancel();
+          _countdownTimer?.cancel();
+          Navigator.pop(context);
+          widget.onAccepted(checkRes['data']);
+        } else if (status == 'cancelled' || status == 'completed') {
+          _statusPollTimer?.cancel();
+          _countdownTimer?.cancel();
+          Navigator.pop(context);
+          widget.onDeclined();
+        }
+      }
+    });
+  }
+
+  Future<void> _cancelCall({bool timeout = false}) async {
+    _statusPollTimer?.cancel();
+    _countdownTimer?.cancel();
+    if (_sessionId != null) {
+      await ApiService.post('/sessions/reject.php', {'session_id': _sessionId});
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
+    if (timeout) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AstroTheme.forestSurface,
+          content: Text('Astrologer is currently busy. Please try again or book an appointment.', style: TextStyle(color: AstroTheme.solarYellow)),
         ),
       );
     } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LiveAgoraCallScreen(
-            astrologer: astrologer,
-            ratePerMin: ratePerMin,
-            isVideo: type == 'video',
-          ),
+      widget.onDeclined();
+    }
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _countdownTimer?.cancel();
+    _statusPollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String typeLabel = widget.type == 'video'
+        ? 'Live Video Call'
+        : (widget.type == 'chat' ? 'Live Chat Consultation' : 'Voice Call Consultation');
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+        decoration: BoxDecoration(
+          color: AstroTheme.pineDark,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AstroTheme.royalGold, width: 2),
+          boxShadow: [
+            BoxShadow(color: AstroTheme.royalGold.withAlpha(50), blurRadius: 30),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Pulsing Rings Avatar
+            AnimatedBuilder(
+              animation: _animController,
+              builder: (ctx, child) {
+                return Container(
+                  padding: EdgeInsets.all(8 * _animController.value + 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AstroTheme.solarYellow.withAlpha(((1 - _animController.value) * 255).round().clamp(0, 255)), width: 3),
+                  ),
+                  child: child,
+                );
+              },
+              child: CircleAvatar(
+                radius: 44,
+                backgroundImage: safeAstroImage(widget.astrologer['image']),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AstroTheme.solarYellow.withAlpha(30),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AstroTheme.solarYellow),
+              ),
+              child: Text(
+                '$typeLabel • ₹${widget.ratePerMin.toInt()}/min',
+                style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Text(
+              widget.astrologer['name'] ?? 'Guruji',
+              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.astrologer['speciality'] ?? 'Vedic Astrology',
+              style: const TextStyle(color: AstroTheme.textMint, fontSize: 11),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 20),
+
+            // Ringing animation / status text
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AstroTheme.solarYellow),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _statusText,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // 30s Countdown
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AstroTheme.royalGold, width: 2),
+              ),
+              child: Text(
+                '$_secondsLeft',
+                style: const TextStyle(color: AstroTheme.royalGold, fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text('Seconds waiting for astrologer', style: TextStyle(color: Colors.white38, fontSize: 10)),
+            const SizedBox(height: 24),
+
+            // End / Cancel Call Button
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AstroTheme.statusDanger,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => _cancelCall(timeout: false),
+              icon: const Icon(Icons.call_end, size: 18),
+              label: const Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 FULL-SCREEN INCOMING CALL SCREEN (HIGH PRIORITY DEVOTEE ANSWER / DECLINE SCREEN)
+// ==============================================================================
+class FullScreenIncomingCallScreen extends StatefulWidget {
+  final Map<String, dynamic> astrologer;
+  final String sessionId;
+  final String channelName;
+  final String type; // 'audio', 'video', 'chat'
+  final double ratePerMin;
+  final Function(Map<String, dynamic> data) onConnected;
+  final VoidCallback onDeclined;
+
+  const FullScreenIncomingCallScreen({
+    super.key,
+    required this.astrologer,
+    required this.sessionId,
+    required this.channelName,
+    required this.type,
+    required this.ratePerMin,
+    required this.onConnected,
+    required this.onDeclined,
+  });
+
+  @override
+  State<FullScreenIncomingCallScreen> createState() => _FullScreenIncomingCallScreenState();
+}
+
+class _FullScreenIncomingCallScreenState extends State<FullScreenIncomingCallScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  int _secondsRemaining = 30;
+  Timer? _countdownTimer;
+  bool _isConnecting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_secondsRemaining > 1) {
+        setState(() => _secondsRemaining--);
+      } else {
+        _declineCall(timeout: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _acceptCall() async {
+    if (_isConnecting) return;
+    setState(() => _isConnecting = true);
+    _countdownTimer?.cancel();
+
+    final res = await ApiService.post('/sessions/user_accept.php', {
+      'session_id': widget.sessionId,
+      'user_id': UserState.userId,
+    });
+
+    if (!mounted) return;
+
+    if (res['ok'] == true && res['data'] != null) {
+      Navigator.pop(context); // Close full screen call screen
+      widget.onConnected(res['data']);
+    } else {
+      setState(() => _isConnecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.forestSurface,
+          content: Text(res['message'] ?? 'Unable to connect room. Please try again.',
+              style: const TextStyle(color: Colors.redAccent)),
         ),
       );
     }
+  }
+
+  Future<void> _declineCall({bool timeout = false}) async {
+    _countdownTimer?.cancel();
+    await ApiService.post('/sessions/reject.php', {'session_id': widget.sessionId});
+    if (!mounted) return;
+    Navigator.pop(context);
+    widget.onDeclined();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isVideo = widget.type == 'video';
+    final bool isChat = widget.type == 'chat';
+    final String callTypeTitle = isVideo
+        ? 'Live Video Call'
+        : (isChat ? 'Live Chat Consultation' : 'Vedic Voice Call');
+
+    return Scaffold(
+      backgroundColor: AstroTheme.pineDark,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Ambient Aura Gradients
+            Positioned(
+              top: -80,
+              left: -80,
+              child: Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AstroTheme.solarYellow.withAlpha(20),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AstroTheme.statusOnline.withAlpha(20),
+                ),
+              ),
+            ),
+
+            // Main Content
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Top Status Pill
+                  Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AstroTheme.statusOnline.withAlpha(30),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AstroTheme.statusOnline, width: 1.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AstroTheme.statusOnline,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'INCOMING CALL • ஜோதிடர் அழைக்கிறார்',
+                              style: TextStyle(
+                                color: AstroTheme.emeraldAccent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        callTypeTitle,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Center Astrologer Avatar & Details
+                  Column(
+                    children: [
+                      // Pulsing Rings around Avatar
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (ctx, child) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 170 + (25 * _pulseController.value),
+                                height: 170 + (25 * _pulseController.value),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AstroTheme.statusOnline.withAlpha(
+                                      ((1 - _pulseController.value) * 150).round().clamp(0, 255),
+                                    ),
+                                    width: 2.5,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 150,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AstroTheme.royalGold, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AstroTheme.royalGold.withAlpha(60),
+                                      blurRadius: 30,
+                                      spreadRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: Image(
+                                    image: safeAstroImage(widget.astrologer['image']),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      Text(
+                        widget.astrologer['name'] ?? 'Guruji S. Sundaramurthy',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+
+                      Text(
+                        widget.astrologer['speciality'] ?? 'Vedic Astrology • KP System',
+                        style: const TextStyle(color: AstroTheme.textMint, fontSize: 13),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AstroTheme.forestSurface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AstroTheme.borderGreen),
+                        ),
+                        child: Text(
+                          'Rate: ₹${widget.ratePerMin.toInt()}/min • Wallet: ₹${UserState.walletBalance.toInt()}',
+                          style: const TextStyle(
+                            color: AstroTheme.solarYellow,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Bottom Action Buttons & Countdown
+                  Column(
+                    children: [
+                      // Countdown Ring
+                      Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AstroTheme.royalGold, width: 2),
+                        ),
+                        child: Text(
+                          '$_secondsRemaining',
+                          style: const TextStyle(
+                            color: AstroTheme.royalGold,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'அழைப்பை ஏற்க விநாடிகள் (Seconds to Answer)',
+                        style: TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Two Large Call Buttons
+                      Row(
+                        children: [
+                          // Decline Button
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AstroTheme.statusDanger,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 54),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: _isConnecting ? null : () => _declineCall(),
+                              icon: const Icon(Icons.call_end, size: 22),
+                              label: const Text(
+                                'Decline (நிராகரி)',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Accept Button
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AstroTheme.statusOnline,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 54),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 8,
+                                shadowColor: AstroTheme.statusOnline.withAlpha(100),
+                              ),
+                              onPressed: _isConnecting ? null : _acceptCall,
+                              icon: _isConnecting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.call, size: 22),
+                              label: Text(
+                                _isConnecting ? 'Connecting...' : 'Accept (இணை)',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -704,12 +1491,18 @@ class LiveAgoraCallScreen extends StatefulWidget {
   final Map<String, dynamic> astrologer;
   final double ratePerMin;
   final bool isVideo;
+  final String? sessionId;
+  final String? channelName;
+  final String? agoraToken;
 
   const LiveAgoraCallScreen({
     super.key,
     required this.astrologer,
     required this.ratePerMin,
     required this.isVideo,
+    this.sessionId,
+    this.channelName,
+    this.agoraToken,
   });
 
   @override
@@ -737,33 +1530,52 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
       if (mounted) setState(() => _seconds++);
     });
 
-    _billingTimer = Timer.periodic(const Duration(seconds: 60), (t) {
+    _billingTimer = Timer.periodic(const Duration(seconds: 60), (t) async {
       if (!mounted) return;
-      if (UserState.walletBalance >= widget.ratePerMin) {
-        setState(() {
-          UserState.walletBalance -= widget.ratePerMin;
-          _totalDeducted += widget.ratePerMin;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AstroTheme.forestSurface,
-            content: Text(
-              '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-              style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      if (widget.sessionId != null) {
+        final hbRes = await ApiService.post('/sessions/heartbeat.php', {'session_id': widget.sessionId});
+        if (!mounted) return;
+        if (hbRes['data'] != null && hbRes['data']['terminate'] == true) {
+          _endCall(exhausted: true);
+          return;
+        }
+        if (hbRes['data'] != null && hbRes['data']['remaining_balance'] != null) {
+          setState(() {
+            UserState.walletBalance = (hbRes['data']['remaining_balance'] as num).toDouble();
+            _totalDeducted += widget.ratePerMin;
+          });
+        }
       } else {
-        _endCall(exhausted: true);
+        if (UserState.walletBalance >= widget.ratePerMin) {
+          setState(() {
+            UserState.walletBalance -= widget.ratePerMin;
+            _totalDeducted += widget.ratePerMin;
+          });
+        } else {
+          _endCall(exhausted: true);
+          return;
+        }
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.forestSurface,
+          content: Text(
+            '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
+            style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     });
   }
 
   void _endCall({bool exhausted = false}) {
     _timer?.cancel();
     _billingTimer?.cancel();
+    if (widget.sessionId != null) {
+      ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+    }
 
     showDialog(
       context: context,
@@ -1151,11 +1963,15 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
 class LiveChatConsultationScreen extends StatefulWidget {
   final Map<String, dynamic> astrologer;
   final double ratePerMin;
+  final String? sessionId;
+  final String? channelName;
 
   const LiveChatConsultationScreen({
     super.key,
     required this.astrologer,
     required this.ratePerMin,
+    this.sessionId,
+    this.channelName,
   });
 
   @override
@@ -1193,7 +2009,12 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (widget.sessionId != null) {
+                ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+              }
+              Navigator.pop(context);
+            },
             child: const Text('End Chat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -2715,6 +3536,78 @@ class AstrologerDashboardScreen extends StatefulWidget {
 }
 
 class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
+  Timer? _pendingPollTimer;
+  bool _isIncomingAlertShowing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startPendingSessionPolling();
+  }
+
+  void _startPendingSessionPolling() {
+    _pendingPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (t) async {
+      if (!mounted || _isIncomingAlertShowing || !AstrologerState.isMasterOnline) return;
+      final res = await ApiService.get('/sessions/pending.php?astrologer_id=1&phone=${AstrologerState.phone}');
+      if (!mounted || _isIncomingAlertShowing) return;
+
+      if (res['ok'] == true && res['data'] != null && res['data']['has_incoming'] == true) {
+        final session = res['data']['session'];
+        if (session != null) {
+          _triggerRealIncomingCallAlert(session);
+        }
+      }
+    });
+  }
+
+  void _triggerRealIncomingCallAlert(Map<String, dynamic> session) {
+    setState(() => _isIncomingAlertShowing = true);
+    final String clientName = session['user_name'] ?? 'Devotee User';
+    final String clientPhone = session['user_phone'] ?? '';
+    final String type = session['type'] ?? 'audio';
+    final double rate = (session['rate_per_min'] as num?)?.toDouble() ?? AstrologerState.audioRate;
+    final String sessionId = session['session_id'] ?? '';
+    final String channelName = session['channel_name'] ?? '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => IncomingCallDialog(
+        callerName: clientName,
+        category: '${type.toUpperCase()} Consultation • $clientPhone',
+        language: 'Tamil / English',
+        ratePerMin: rate,
+        sessionId: sessionId,
+        onAccept: () async {
+          setState(() => _isIncomingAlertShowing = false);
+          await ApiService.post('/sessions/accept.php', {
+            'session_id': sessionId,
+            'astrologer_id': 1,
+          });
+
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AstrologerActiveConsultationScreen(
+                clientName: clientName,
+                consultationType: '${type.toUpperCase()} Call',
+                sessionId: sessionId,
+                channelName: channelName,
+              ),
+            ),
+          );
+        },
+        onDecline: () async {
+          setState(() => _isIncomingAlertShowing = false);
+          await ApiService.post('/sessions/reject.php', {'session_id': sessionId});
+        },
+      ),
+    ).then((_) {
+      if (mounted) setState(() => _isIncomingAlertShowing = false);
+    });
+  }
+
   void _triggerIncomingCallAlert() {
     showDialog(
       context: context,
@@ -2737,6 +3630,12 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _pendingPollTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -3181,6 +4080,8 @@ class IncomingCallDialog extends StatefulWidget {
   final String language;
   final double ratePerMin;
   final VoidCallback onAccept;
+  final VoidCallback? onDecline;
+  final String? sessionId;
 
   const IncomingCallDialog({
     super.key,
@@ -3189,6 +4090,8 @@ class IncomingCallDialog extends StatefulWidget {
     required this.language,
     required this.ratePerMin,
     required this.onAccept,
+    this.onDecline,
+    this.sessionId,
   });
 
   @override
@@ -3208,6 +4111,7 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
         setState(() => _secondsRemaining--);
       } else {
         _timer?.cancel();
+        widget.onDecline?.call();
         Navigator.pop(context);
       }
     });
@@ -3300,6 +4204,7 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
                     ),
                     onPressed: () {
                       _timer?.cancel();
+                      widget.onDecline?.call();
                       Navigator.pop(context);
                     },
                     icon: const Icon(Icons.call_end, size: 18),
@@ -3339,11 +4244,15 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
 class AstrologerActiveConsultationScreen extends StatefulWidget {
   final String clientName;
   final String consultationType;
+  final String? sessionId;
+  final String? channelName;
 
   const AstrologerActiveConsultationScreen({
     super.key,
     required this.clientName,
     required this.consultationType,
+    this.sessionId,
+    this.channelName,
   });
 
   @override
@@ -3351,7 +4260,7 @@ class AstrologerActiveConsultationScreen extends StatefulWidget {
 }
 
 class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveConsultationScreen> {
-  int _secondsElapsed = 258; // 04:18
+  int _secondsElapsed = 0;
   Timer? _sessionTimer;
   bool _isMuted = false;
   bool _isSpeaker = true;
@@ -3372,6 +4281,10 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
   @override
   void initState() {
     super.initState();
+    // For unit tests / mock simulation, preserve 258s initial timer, for real calls start from 0
+    if (widget.sessionId == null) {
+      _secondsElapsed = 258;
+    }
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() => _secondsElapsed++);
@@ -3548,8 +4461,12 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         _sessionTimer?.cancel();
+                        if (widget.sessionId != null) {
+                          await ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+                        }
+                        if (!mounted || !context.mounted) return;
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

@@ -485,52 +485,18 @@ if ($currentAstro) {
                         <div class="flex items-center gap-2">
                             <span class="w-3 h-3 rounded-full bg-status-online animate-ping"></span>
                             <h3 class="font-bold text-sm text-slate-900 dark:text-white">Live Consultation Queue (நேரலை வரிசை)</h3>
-                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold">2 Waiting</span>
+                            <span id="queueCountBadge" class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold">0 Waiting</span>
                         </div>
-                        <button onclick="triggerIncomingAlert()" class="text-xs text-pine dark:text-gold font-bold hover:underline">
-                            + Simulate Incoming Call
-                        </button>
+                        <span class="text-[11px] text-gray-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Auto-Sync Active
+                        </span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Queue Item 1 -->
-                        <div class="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-[#F8F9FA] dark:bg-white/5 flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-11 h-11 rounded-full bg-pine/10 dark:bg-gold/10 text-pine dark:text-gold font-bold flex items-center justify-center text-sm border border-pine/20">
-                                    KR
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-xs text-slate-800 dark:text-white">Karthik R.</h4>
-                                        <span class="px-1.5 py-0.5 bg-pine/10 text-pine dark:text-gold text-[9px] font-bold rounded">Audio Call</span>
-                                    </div>
-                                    <p class="text-[11px] text-gray-500">Tamil • Love & Marriage Matching</p>
-                                    <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: 2 mins • Wallet ₹450</p>
-                                </div>
-                            </div>
-                            <button onclick="acceptConsultationDirect('Karthik R.', 'Audio Call', '₹20/min')" class="px-3.5 py-2 rounded-xl bg-status-online hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
-                                <i data-lucide="phone" class="w-3.5 h-3.5"></i> Connect
-                            </button>
-                        </div>
-
-                        <!-- Queue Item 2 -->
-                        <div class="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-[#F8F9FA] dark:bg-white/5 flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-11 h-11 rounded-full bg-gold/10 text-gold-amber font-bold flex items-center justify-center text-sm border border-gold/20">
-                                    PM
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-xs text-slate-800 dark:text-white">Priya M.</h4>
-                                        <span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[9px] font-bold rounded">Live Chat</span>
-                                    </div>
-                                    <p class="text-[11px] text-gray-500">English • Career & Business Astro</p>
-                                    <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: 4 mins • Wallet ₹600</p>
-                                </div>
-                            </div>
-                            <button onclick="acceptConsultationDirect('Priya M.', 'Live Chat', '₹12/min')" class="px-3.5 py-2 rounded-xl bg-pine hover:bg-pine-light dark:bg-gold dark:text-pine-dark text-white text-xs font-bold shadow-md transition flex items-center gap-1.5">
-                                <i data-lucide="message-square" class="w-3.5 h-3.5"></i> Start Chat
-                            </button>
+                    <div id="liveQueueContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
+                            <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
+                            <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
+                            <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
                         </div>
                     </div>
                 </div>
@@ -1045,6 +1011,35 @@ if ($currentAstro) {
             </div>
         </div>
 
+        <!-- MODAL: RINGING DEVOTEE PHONE (WAITING FOR DEVOTEE TO ANSWER) -->
+        <div id="ringingUserModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 hidden">
+            <div class="w-full max-w-md bg-white dark:bg-[#1A1A1A] border-2 border-emerald-500 rounded-3xl p-6 sm:p-8 shadow-2xl relative text-center overflow-hidden">
+                <div class="relative z-10">
+                    <div class="relative inline-block mb-4">
+                        <div class="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-500 border-2 border-emerald-500 flex items-center justify-center mx-auto shadow-lg animate-pulse">
+                            <i data-lucide="phone-outgoing" class="w-10 h-10 animate-bounce"></i>
+                        </div>
+                        <span class="absolute -top-1 -right-1 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-md">RINGING</span>
+                    </div>
+
+                    <h3 class="font-cinzel text-lg font-bold text-slate-900 dark:text-white" id="ringingDevoteeName">பக்தருக்கு அழைப்பு செல்கிறது...</h3>
+                    <p class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Devotee Phone is Ringing via FCM Full-Screen Alert</p>
+                    <p class="text-[11px] text-gray-400 mt-1">பக்தர் போனை எடுத்தவுடன் Live Consultation Room தானாக இணையும்.</p>
+
+                    <div class="my-5 flex items-center justify-center gap-2">
+                        <div class="w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin flex items-center justify-center font-mono font-bold text-sm text-slate-800 dark:text-white">
+                            <span id="ringingCountdownSeconds">30</span>
+                        </div>
+                        <span class="text-xs text-gray-400">Waiting for answer</span>
+                    </div>
+
+                    <button onclick="cancelRingingUser()" class="w-full py-3 rounded-xl bg-red-50 dark:bg-red-950/40 text-status-danger border border-red-200 dark:border-red-800/40 font-bold text-xs hover:bg-red-100 transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="x-circle" class="w-4 h-4"></i> Cancel Call
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- MODAL: KUNDALI BIRTH CHART GENERATOR -->
         <div id="kundaliModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
             <div class="w-full max-w-xl bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -1192,13 +1187,102 @@ if ($currentAstro) {
         lucide.createIcons();
     }
 
-    // Incoming Consultation Alert Modal (Screen 2)
+    // Incoming Consultation Alert Modal (Screen 2) - Real-time Polling & Agora Hook
     let countdownInterval = null;
-    function triggerIncomingAlert() {
+    let currentIncomingSession = null;
+    let pendingPollInterval = null;
+
+    let ringingPollInterval = null;
+    let ringingCountdownInterval = null;
+
+    function renderQueueUI(session) {
+        const queueContainer = document.getElementById('liveQueueContainer');
+        const badge = document.getElementById('queueCountBadge');
+        if (!queueContainer || !badge) return;
+
+        if (session) {
+            badge.textContent = '1 Waiting';
+            badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 text-[10px] font-bold animate-pulse';
+            queueContainer.innerHTML = `
+                <div class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-50/10 dark:bg-emerald-950/20 flex items-center justify-between gap-4 shadow-sm animate-pulse">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-full bg-emerald-500/10 text-emerald-600 font-bold flex items-center justify-center text-sm border border-emerald-500/30">
+                            ${(session.user_name || 'DV').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="font-bold text-xs text-slate-800 dark:text-white">${session.user_name || 'பக்தர்'}</h4>
+                                <span class="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 text-[9px] font-bold rounded uppercase">${session.type || 'audio'} Call</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500">${session.user_phone || '8000000001'} • ₹${session.rate_per_min}/min</p>
+                            <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: ${session.seconds_elapsed || 0}s</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerIncomingAlert(${session.seconds_left || 30})" class="px-3.5 py-2 rounded-xl bg-status-online hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+                        <i data-lucide="phone" class="w-3.5 h-3.5"></i> Connect
+                    </button>
+                </div>
+            `;
+        } else {
+            badge.textContent = '0 Waiting';
+            badge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold';
+            queueContainer.innerHTML = `
+                <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
+                    <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
+                    <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
+                </div>
+            `;
+        }
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function startPendingPoll() {
+        if (pendingPollInterval) clearInterval(pendingPollInterval);
+        pendingPollInterval = setInterval(async () => {
+            const modal = document.getElementById('incomingAlertModal');
+            const ringingModal = document.getElementById('ringingUserModal');
+            const activeScreen = document.getElementById('screenActiveConsultation');
+            // If already in active call or alert/ringing modal is showing, skip
+            if (!modal.classList.contains('hidden') || 
+                (ringingModal && !ringingModal.classList.contains('hidden')) || 
+                (activeScreen && !activeScreen.classList.contains('hidden'))) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/sessions/pending.php?astrologer_id=1&phone=9876543210');
+                const json = await res.json();
+                if (json.ok && json.data && json.data.has_incoming && json.data.session) {
+                    currentIncomingSession = json.data.session;
+                    renderQueueUI(currentIncomingSession);
+                    document.getElementById('incomingDevoteeName').textContent = currentIncomingSession.user_name || 'பக்தர் (Devotee)';
+                    
+                    const phoneTag = document.querySelector('#incomingAlertModal .text-xs.text-pine');
+                    if (phoneTag) {
+                        phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • Preferred: Tamil';
+                    }
+
+                    const catTag = document.querySelector('#incomingAlertModal span.font-bold');
+                    if (catTag) {
+                        catTag.textContent = (currentIncomingSession.type || 'audio').toUpperCase() + ' Call (₹' + currentIncomingSession.rate_per_min + '/m)';
+                    }
+
+                    triggerIncomingAlert(currentIncomingSession.seconds_left || 30);
+                } else {
+                    renderQueueUI(null);
+                }
+            } catch (err) {
+                // background poll silent catch
+            }
+        }, 2000);
+    }
+
+    function triggerIncomingAlert(customSeconds = 30) {
         const modal = document.getElementById('incomingAlertModal');
         modal.classList.remove('hidden');
 
-        let seconds = 30;
+        let seconds = customSeconds > 0 ? customSeconds : 30;
         const countSpan = document.getElementById('countdownSeconds');
         if (countdownInterval) clearInterval(countdownInterval);
 
@@ -1207,30 +1291,132 @@ if ($currentAstro) {
             if (countSpan) countSpan.textContent = seconds;
             if (seconds <= 0) {
                 clearInterval(countdownInterval);
-                modal.classList.add('hidden');
+                declineConsultation();
             }
         }, 1000);
     }
 
-    function declineConsultation() {
+    async function declineConsultation() {
         if (countdownInterval) clearInterval(countdownInterval);
         document.getElementById('incomingAlertModal').classList.add('hidden');
+        if (currentIncomingSession && currentIncomingSession.session_id) {
+            try {
+                await fetch('/api/sessions/reject.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentIncomingSession.session_id })
+                });
+            } catch (e) {}
+            currentIncomingSession = null;
+        }
+        renderQueueUI(null);
     }
 
-    function acceptConsultationFromAlert() {
-        declineConsultation();
-        showScreen('screenActiveConsultation');
-        startConsultationTimer();
+    async function acceptConsultationFromAlert() {
+        if (countdownInterval) clearInterval(countdownInterval);
+        document.getElementById('incomingAlertModal').classList.add('hidden');
+
+        if (!currentIncomingSession || !currentIncomingSession.session_id) {
+            return;
+        }
+
+        const sid = currentIncomingSession.session_id;
+
+        try {
+            // 1. Astrologer signals Accept -> Session becomes 'ringing_user' & triggers FCM
+            const res = await fetch('/api/sessions/accept.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sid, astrologer_id: 1 })
+            });
+            const data = await res.json();
+
+            // 2. Open Ringing Devotee Modal
+            const ringingModal = document.getElementById('ringingUserModal');
+            if (ringingModal) {
+                ringingModal.classList.remove('hidden');
+                document.getElementById('ringingDevoteeName').textContent = (currentIncomingSession.user_name || 'பக்தர்') + ' அவர்களுக்கு ரிங் போகிறது...';
+                
+                let rSeconds = 30;
+                const rCountSpan = document.getElementById('ringingCountdownSeconds');
+                if (ringingCountdownInterval) clearInterval(ringingCountdownInterval);
+                ringingCountdownInterval = setInterval(() => {
+                    rSeconds--;
+                    if (rCountSpan) rCountSpan.textContent = rSeconds;
+                    if (rSeconds <= 0) {
+                        clearInterval(ringingCountdownInterval);
+                        cancelRingingUser();
+                    }
+                }, 1000);
+            }
+
+            // 3. Poll for Devotee Answer (User Accept) -> status becomes 'active'
+            if (ringingPollInterval) clearInterval(ringingPollInterval);
+            ringingPollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/api/sessions/check_status.php?session_id=${sid}`);
+                    const statusData = await statusRes.json();
+
+                    if (statusData.ok && statusData.data) {
+                        const curStatus = statusData.data.status;
+                        if (curStatus === 'active') {
+                            // Devotee Accepted! Room is created!
+                            clearInterval(ringingPollInterval);
+                            clearInterval(ringingCountdownInterval);
+                            if (ringingModal) ringingModal.classList.add('hidden');
+
+                            document.getElementById('activeClientName').textContent = (currentIncomingSession.user_name || 'பக்தர்') + ' (' + (currentIncomingSession.type || 'audio').toUpperCase() + ')';
+                            showScreen('screenActiveConsultation');
+                            timerSeconds = 0;
+                            startConsultationTimer();
+                        } else if (curStatus === 'cancelled' || curStatus === 'completed') {
+                            clearInterval(ringingPollInterval);
+                            clearInterval(ringingCountdownInterval);
+                            if (ringingModal) ringingModal.classList.add('hidden');
+                            alert('பக்தர் அழைப்பை ஏற்கவில்லை / ரத்து செய்துவிட்டார் (Devotee declined or missed call).');
+                            currentIncomingSession = null;
+                            renderQueueUI(null);
+                        }
+                    }
+                } catch (e) {
+                    // silent catch
+                }
+            }, 1000);
+
+        } catch (e) {
+            console.error('Accept error:', e);
+            alert('அழைப்பை ஏற்க இயலவில்லை: ' + e);
+        }
+    }
+
+    async function cancelRingingUser() {
+        if (ringingCountdownInterval) clearInterval(ringingCountdownInterval);
+        if (ringingPollInterval) clearInterval(ringingPollInterval);
+        const ringingModal = document.getElementById('ringingUserModal');
+        if (ringingModal) ringingModal.classList.add('hidden');
+
+        if (currentIncomingSession && currentIncomingSession.session_id) {
+            try {
+                await fetch('/api/sessions/reject.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentIncomingSession.session_id })
+                });
+            } catch (e) {}
+            currentIncomingSession = null;
+        }
+        renderQueueUI(null);
     }
 
     function acceptConsultationDirect(name, type, rate) {
         document.getElementById('activeClientName').textContent = name + ' (' + type + ')';
         showScreen('screenActiveConsultation');
+        timerSeconds = 0;
         startConsultationTimer();
     }
 
     // Active Consultation Timer & Dynamic Earnings Ticker
-    let timerSeconds = 258; // 04:18
+    let timerSeconds = 0;
     let timerInterval = null;
     function startConsultationTimer() {
         if (timerInterval) clearInterval(timerInterval);
@@ -1286,10 +1472,20 @@ if ($currentAstro) {
         btn.classList.toggle('text-status-online');
     }
 
-    function endConsultationConfirm() {
-        if (confirm('நிச்சயமாக இந்த ஆலோசனையை முடிக்க விரும்புகிறீர்களா? (End Consultation and record ₹147.00 earnings?)')) {
+    async function endConsultationConfirm() {
+        if (confirm('நிச்சயமாக இந்த ஆலோசனையை முடிக்க விரும்புகிறீர்களா? (End Consultation and finalize session?)')) {
             if (timerInterval) clearInterval(timerInterval);
-            alert('Consultation Completed! ₹147.00 credited to your Astrologer Wallet.');
+            if (currentIncomingSession && currentIncomingSession.session_id) {
+                try {
+                    await fetch('/api/sessions/end.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: currentIncomingSession.session_id, rating: 5 })
+                    });
+                } catch (e) {}
+                currentIncomingSession = null;
+            }
+            alert('Consultation Completed! Session ended and earnings credited to your Astrologer Wallet.');
             showScreen('screenHome');
         }
     }
@@ -1326,6 +1522,10 @@ if ($currentAstro) {
     function saveScheduleToast() {
         alert('Availability Shift Hours (Morning 09:00 AM – 01:00 PM & Evening 05:00 PM – 10:00 PM) Saved Successfully!');
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        startPendingPoll();
+    });
 </script>
 </body>
 </html>

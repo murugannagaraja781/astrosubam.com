@@ -64,9 +64,11 @@ $items = [
     'assets',
     'api',
     'admin',
+    'astrologer',
     'config',
     'database',
-    'helpers'
+    'helpers',
+    'AstroSubam.apk'
 ];
 
 echo "\n[2/4] Uploading website files & directories...\n";

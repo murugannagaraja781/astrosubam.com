@@ -22,7 +22,7 @@ if (!$session) {
 }
 
 $db->prepare("UPDATE consultation_sessions 
-              SET status = 'completed', end_time = NOW(), rating = ?, review = ? 
+              SET status = 'completed', end_time = CURRENT_TIMESTAMP, rating = ?, review = ? 
               WHERE id = ?")
    ->execute([$rating, $review, $session['id']]);
 
