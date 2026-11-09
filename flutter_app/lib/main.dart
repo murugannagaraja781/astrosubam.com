@@ -193,14 +193,17 @@ class UserState {
 // ==============================================================================
 class AstrologerState {
   static bool isLoggedIn = false;
+  static int numericId = 1;
   static String astrologerId = 'ASTRO_1';
   static String name = 'Guruji S. Sundaramurthy';
   static String phone = '9876543210';
   static String email = 'sundaramurthy@astrosubam.com';
   static String avatar = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80';
   static String approvalStatus = 'approved'; // 'approved', 'pending', 'rejected'
-  static double withdrawableBalance = 1450.00;
-  static double lifetimeEarnings = 12500.00;
+  static double withdrawableBalance = 0.00;
+  static double lifetimeEarnings = 0.00;
+  static double todayEarnings = 0.00;
+  static int completedConsultations = 0;
   static bool isMasterOnline = true;
   static bool isChatOnline = true;
   static bool isAudioOnline = true;
@@ -3099,16 +3102,28 @@ class _AuthScreenState extends State<AuthScreen> {
     AstrologerState.isLoggedIn = true;
     AstrologerState.phone = phone;
     if (phone == '9876543211') {
+      AstrologerState.numericId = 2;
       AstrologerState.name = 'Dr. K. Jayalakshmi';
       AstrologerState.astrologerId = 'ASTRO_2';
       AstrologerState.specialities = 'Nadi Astrology • Gemology • Career Astro';
+      AstrologerState.audioRate = 18.0;
+      AstrologerState.videoRate = 30.0;
+      AstrologerState.chatRate = 10.0;
     } else if (phone == '9876543212') {
+      AstrologerState.numericId = 3;
       AstrologerState.name = 'Acharya Ramanan Sarma';
       AstrologerState.astrologerId = 'ASTRO_3';
       AstrologerState.specialities = 'Prasanna Jyothidam • Dosha Nivarana';
+      AstrologerState.audioRate = 25.0;
+      AstrologerState.videoRate = 40.0;
+      AstrologerState.chatRate = 15.0;
     } else {
+      AstrologerState.numericId = 1;
       AstrologerState.name = 'Guruji S. Sundaramurthy';
       AstrologerState.astrologerId = 'ASTRO_1';
+      AstrologerState.audioRate = 20.0;
+      AstrologerState.videoRate = 35.0;
+      AstrologerState.chatRate = 12.0;
     }
 
     if (mounted) {
@@ -3580,28 +3595,52 @@ class AstrologerDashboardScreen extends StatefulWidget {
 }
 
 class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
-  Timer? _pendingPollTimer;
+  Timer? _dashboardPollTimer;
   bool _isIncomingAlertShowing = false;
+  List<Map<String, dynamic>> _pendingQueue = [];
+  int _waitingCount = 0;
+  double _todayEarnings = 0.0;
+  double _walletBalance = 0.0;
+  int _totalConsultations = 0;
 
   @override
   void initState() {
     super.initState();
-    _startPendingSessionPolling();
+    _fetchDashboard();
+    _dashboardPollTimer = Timer.periodic(const Duration(milliseconds: 2000), (t) {
+      if (mounted) _fetchDashboard();
+    });
   }
 
-  void _startPendingSessionPolling() {
-    _pendingPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (t) async {
-      if (!mounted || _isIncomingAlertShowing || !AstrologerState.isMasterOnline) return;
-      final res = await ApiService.get('/sessions/pending.php?astrologer_id=1&phone=${AstrologerState.phone}');
-      if (!mounted || _isIncomingAlertShowing) return;
+  Future<void> _fetchDashboard() async {
+    if (!mounted || !AstrologerState.isMasterOnline) return;
+    try {
+      final res = await ApiService.get(
+        '/astrologers/dashboard.php?astrologer_id=${AstrologerState.numericId}&phone=${AstrologerState.phone}',
+      );
+      if (!mounted) return;
+      if (res['ok'] == true && res['data'] != null) {
+        final data = res['data'];
+        final q = data['pending_queue'];
+        setState(() {
+          _todayEarnings = (data['today_earnings'] as num?)?.toDouble() ?? 0.0;
+          _walletBalance = (data['wallet_balance'] as num?)?.toDouble() ?? 0.0;
+          _totalConsultations = (data['total_consultations'] as num?)?.toInt() ?? 0;
+          AstrologerState.withdrawableBalance = _walletBalance;
 
-      if (res['ok'] == true && res['data'] != null && res['data']['has_incoming'] == true) {
-        final session = res['data']['session'];
-        if (session != null) {
-          _triggerRealIncomingCallAlert(session);
+          if (q is List) {
+            _pendingQueue = List<Map<String, dynamic>>.from(q);
+          } else {
+            _pendingQueue = [];
+          }
+          _waitingCount = (data['waiting_count'] as num?)?.toInt() ?? _pendingQueue.length;
+        });
+
+        if (data['has_incoming'] == true && !_isIncomingAlertShowing && data['latest_session'] != null) {
+          _triggerRealIncomingCallAlert(Map<String, dynamic>.from(data['latest_session']));
         }
       }
-    });
+    } catch (_) {}
   }
 
   void _triggerRealIncomingCallAlert(Map<String, dynamic> session) {
@@ -3626,7 +3665,7 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
           setState(() => _isIncomingAlertShowing = false);
           await ApiService.post('/sessions/accept.php', {
             'session_id': sessionId,
-            'astrologer_id': 1,
+            'astrologer_id': AstrologerState.numericId,
           });
 
           if (!mounted) return;
@@ -3652,33 +3691,28 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
     });
   }
 
-  void _triggerIncomingCallAlert() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => IncomingCallDialog(
-        callerName: 'Karthik R.',
-        category: 'Love & Marriage Compatibility',
-        language: 'Tamil',
-        ratePerMin: AstrologerState.audioRate,
-        onAccept: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AstrologerActiveConsultationScreen(
-                clientName: 'Karthik R.',
-                consultationType: 'Audio Call',
-              ),
-            ),
-          );
-        },
+  Future<void> _connectToSession(String sId, String name, String type, String channel) async {
+    await ApiService.post('/sessions/accept.php', {
+      'session_id': sId,
+      'astrologer_id': AstrologerState.numericId,
+    });
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AstrologerActiveConsultationScreen(
+          clientName: name,
+          consultationType: '$type Call',
+          sessionId: sId,
+          channelName: channel,
+        ),
       ),
     );
   }
 
   @override
   void dispose() {
-    _pendingPollTimer?.cancel();
+    _dashboardPollTimer?.cancel();
     super.dispose();
   }
 
@@ -3749,11 +3783,6 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_active, color: AstroTheme.royalGold),
-            tooltip: 'Simulate Incoming Call',
-            onPressed: _triggerIncomingCallAlert,
-          ),
-          IconButton(
             icon: const Icon(Icons.logout, color: Colors.redAccent),
             tooltip: 'Logout',
             onPressed: () {
@@ -3785,28 +3814,49 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                     icon: Icons.phone,
                     label: 'Call',
                     isActive: AstrologerState.isAudioOnline,
-                    onTap: () => setState(() => AstrologerState.isAudioOnline = !AstrologerState.isAudioOnline),
+                    onTap: () async {
+                      setState(() => AstrologerState.isAudioOnline = !AstrologerState.isAudioOnline);
+                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      await ApiService.post('/astrologers/update_status.php', {
+                        'astrologer_id': AstrologerState.numericId,
+                        'status': st,
+                      });
+                    },
                   ),
                   const SizedBox(width: 8),
                   _buildPillToggle(
                     icon: Icons.chat,
                     label: 'Chat',
                     isActive: AstrologerState.isChatOnline,
-                    onTap: () => setState(() => AstrologerState.isChatOnline = !AstrologerState.isChatOnline),
+                    onTap: () async {
+                      setState(() => AstrologerState.isChatOnline = !AstrologerState.isChatOnline);
+                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      await ApiService.post('/astrologers/update_status.php', {
+                        'astrologer_id': AstrologerState.numericId,
+                        'status': st,
+                      });
+                    },
                   ),
                   const SizedBox(width: 8),
                   _buildPillToggle(
                     icon: Icons.videocam,
                     label: 'Video',
                     isActive: AstrologerState.isVideoOnline,
-                    onTap: () => setState(() => AstrologerState.isVideoOnline = !AstrologerState.isVideoOnline),
+                    onTap: () async {
+                      setState(() => AstrologerState.isVideoOnline = !AstrologerState.isVideoOnline);
+                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      await ApiService.post('/astrologers/update_status.php', {
+                        'astrologer_id': AstrologerState.numericId,
+                        'status': st,
+                      });
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
 
-            // Earnings & Metrics Quick-Glance Cards
+            // Earnings & Metrics Quick-Glance Cards (Real-Time from DB)
             Row(
               children: [
                 Expanded(
@@ -3822,13 +3872,16 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                       children: [
                         const Text("Today's Earnings", style: TextStyle(color: Colors.white70, fontSize: 11)),
                         const SizedBox(height: 6),
-                        const Text('₹3,420.00', style: TextStyle(color: AstroTheme.royalGold, fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text(
+                          '₹${_todayEarnings.toStringAsFixed(2)}',
+                          style: const TextStyle(color: AstroTheme.royalGold, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(height: 4),
                         Row(
-                          children: const [
-                            Icon(Icons.trending_up, color: AstroTheme.statusOnline, size: 14),
-                            SizedBox(width: 2),
-                            Text('+18% vs yesterday', style: TextStyle(color: AstroTheme.statusOnline, fontSize: 10, fontWeight: FontWeight.bold)),
+                          children: [
+                            const Icon(Icons.history, color: AstroTheme.statusOnline, size: 14),
+                            const SizedBox(width: 2),
+                            Text('$_totalConsultations Consultations', style: const TextStyle(color: AstroTheme.statusOnline, fontSize: 10, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
@@ -3850,7 +3903,7 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                         const Text('Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 11)),
                         const SizedBox(height: 6),
                         Text(
-                          '₹${AstrologerState.withdrawableBalance.toStringAsFixed(2)}',
+                          '₹${_walletBalance.toStringAsFixed(2)}',
                           style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
@@ -3882,56 +3935,73 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AstroTheme.statusOnline.withAlpha(40),
+                    color: _waitingCount > 0 ? AstroTheme.statusOnline.withAlpha(40) : Colors.white10,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AstroTheme.statusOnline),
+                    border: Border.all(color: _waitingCount > 0 ? AstroTheme.statusOnline : Colors.white24),
                   ),
-                  child: const Text('2 Devotees Waiting', style: TextStyle(color: AstroTheme.statusOnline, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    _waitingCount > 0 ? '$_waitingCount Devotees Waiting' : '0 Devotees in Queue',
+                    style: TextStyle(
+                      color: _waitingCount > 0 ? AstroTheme.statusOnline : Colors.white70,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
 
-            // Queue Card 1
-            _buildQueueCard(
-              name: 'Karthik R.',
-              language: 'Tamil',
-              category: 'Love & Marriage Matching',
-              waitDuration: '2 mins',
-              type: 'Audio Call (₹20/m)',
-              onConnect: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AstrologerActiveConsultationScreen(
-                      clientName: 'Karthik R.',
-                      consultationType: 'Audio Call',
+            // Real Live Consultation Queue (No Fake / Mock Data)
+            if (_pendingQueue.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AstroTheme.forestSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AstroTheme.borderGreen.withAlpha(128)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: AstroTheme.royalGold, size: 32),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No Live Consultation Requests',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      AstrologerState.isMasterOnline
+                          ? 'நேரலை தயார் • You are online & ready to receive devotee calls and chats.'
+                          : 'Offline • Turn status ON to receive devotee requests.',
+                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else
+              ..._pendingQueue.map((req) {
+                final name = req['user_name'] ?? 'Devotee';
+                final phone = req['user_phone'] ?? '';
+                final type = (req['type'] ?? 'audio').toString().toUpperCase();
+                final wait = req['wait_label'] ?? 'Just now';
+                final rate = req['rate_per_min'] ?? AstrologerState.audioRate;
+                final sId = req['session_id'] ?? '';
+                final channel = req['channel_name'] ?? '';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildQueueCard(
+                    name: name,
+                    language: 'Tamil / English',
+                    category: 'Live Devotee Request • $phone',
+                    waitDuration: wait,
+                    type: '$type (₹$rate/m)',
+                    onConnect: () => _connectToSession(sId, name, type, channel),
                   ),
                 );
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // Queue Card 2
-            _buildQueueCard(
-              name: 'Priya M.',
-              language: 'English',
-              category: 'Career & Business Astro',
-              waitDuration: '4 mins',
-              type: 'Live Chat (₹12/m)',
-              onConnect: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AstrologerActiveConsultationScreen(
-                      clientName: 'Priya M.',
-                      consultationType: 'Live Chat',
-                    ),
-                  ),
-                );
-              },
-            ),
+              }),
             const SizedBox(height: 20),
 
             // Quick Actions Grid
@@ -3959,10 +4029,17 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                   onTap: () => showDialog(context: context, builder: (_) => const SchedulerDialog()),
                 ),
                 _buildUtilityTile(
-                  icon: Icons.video_call,
-                  title: 'Simulate Incoming Call',
-                  subtitle: 'Test 30s Alert Popup',
-                  onTap: _triggerIncomingCallAlert,
+                  icon: Icons.star_rate,
+                  title: 'Devotee Ratings',
+                  subtitle: '${AstrologerState.rating} ★ (${AstrologerState.totalReviews} Reviews)',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: AstroTheme.statusOnline,
+                        content: Text('Verified Astrologer Rating: ${AstrologerState.rating} ★ from ${AstrologerState.totalReviews} satisfied devotees.'),
+                      ),
+                    );
+                  },
                 ),
                 _buildUtilityTile(
                   icon: Icons.account_balance_wallet,
