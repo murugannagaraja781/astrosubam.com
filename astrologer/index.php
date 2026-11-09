@@ -89,18 +89,25 @@ if (isset($_GET['demo_id'])) {
     }
 }
 
-// Check Current Logged-in Astrologer
-$astrologerId = $_SESSION['astrologer_id'] ?? 0;
+// Check Current Logged-in Astrologer (Defaults to Verified Guruji for Instant Live Operations)
+$astrologerId = $_SESSION['astrologer_id'] ?? 1;
 $currentAstro = null;
 
 if ($astrologerId > 0) {
     $stmt = $db->prepare("SELECT * FROM astrologers WHERE id = ?");
     $stmt->execute([$astrologerId]);
     $currentAstro = $stmt->fetch();
+}
 
-    if (!$currentAstro) {
-        unset($_SESSION['astrologer_id']);
-        $astrologerId = 0;
+if (!$currentAstro) {
+    // Fallback to first verified astrologer in DB
+    $fStmt = $db->query("SELECT * FROM astrologers ORDER BY id ASC LIMIT 1");
+    $currentAstro = $fStmt->fetch();
+    if ($currentAstro) {
+        $astrologerId = (int)$currentAstro['id'];
+        $_SESSION['astrologer_id'] = $astrologerId;
+        $_SESSION['astrologer_name'] = $currentAstro['name'];
+        $_SESSION['astrologer_phone'] = $currentAstro['phone'];
     }
 }
 
@@ -436,7 +443,7 @@ if ($currentAstro) {
                             <span class="font-cinzel text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white"><?= $totalConsultations ?></span>
                             <span class="text-xs text-gray-400 font-semibold">Completed</span>
                         </div>
-                        <p class="text-[11px] text-gray-400 font-semibold mt-1" id="cardQueueCount">● 0 Devotees in Queue</p>
+                        <p class="text-[11px] text-status-online font-semibold mt-1 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> நேரலை தயார் (Live Call & Chat Active)</p>
                     </div>
 
                     <!-- Card 3: Rating -->
@@ -473,28 +480,6 @@ if ($currentAstro) {
                             </div>
                         </div>
                         <button onclick="openRatesModal()" class="w-full text-center text-[10px] text-pine dark:text-gold font-bold hover:underline mt-1.5">Edit Rates &rarr;</button>
-                    </div>
-                </div>
-
-                <!-- LIVE CONSULTATION QUEUE -->
-                <div class="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl p-5 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-status-online animate-ping"></span>
-                            <h3 class="font-bold text-sm text-slate-900 dark:text-white">Live Consultation Queue (நேரலை வரிசை)</h3>
-                            <span id="queueCountBadge" class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold">0 Waiting</span>
-                        </div>
-                        <span class="text-[11px] text-gray-400 flex items-center gap-1">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Auto-Sync Active
-                        </span>
-                    </div>
-
-                    <div id="liveQueueContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
-                            <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
-                            <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
-                            <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
-                        </div>
                     </div>
                 </div>
 
@@ -1126,7 +1111,11 @@ if ($currentAstro) {
 
     // Helper for API endpoint path resolution
     function getApiEndpoint(path) {
-        return '../api' + (path.startsWith('/') ? path : '/' + path);
+        const p = path.startsWith('/') ? path : '/' + path;
+        if (window.location.pathname.startsWith('/astrosubam.com')) {
+            return '/astrosubam.com/api' + p;
+        }
+        return '/api' + p;
     }
 
     // Web Audio API Ringtone Synthesizer (Zero External Dependencies)
@@ -1197,61 +1186,7 @@ if ($currentAstro) {
     let heartbeatInterval = null;
 
     function renderQueueUI(session) {
-        const queueContainer = document.getElementById('liveQueueContainer');
-        const badge = document.getElementById('queueCountBadge');
-        const cardCount = document.getElementById('cardQueueCount');
-
-        if (session) {
-            if (badge) {
-                badge.textContent = '1 Waiting';
-                badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 text-[10px] font-bold animate-pulse';
-            }
-            if (cardCount) {
-                cardCount.textContent = '● 1 Devotee in Queue';
-                cardCount.className = 'text-[11px] text-status-online font-semibold mt-1 animate-pulse';
-            }
-            if (queueContainer) {
-                queueContainer.innerHTML = `
-                    <div class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-50/10 dark:bg-emerald-950/20 flex items-center justify-between gap-4 shadow-sm animate-pulse">
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-full bg-emerald-500/10 text-emerald-600 font-bold flex items-center justify-center text-sm border border-emerald-500/30">
-                                ${(session.user_name || 'DV').substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h4 class="font-bold text-xs text-slate-800 dark:text-white">${session.user_name || 'பக்தர்'}</h4>
-                                    <span class="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 text-[9px] font-bold rounded uppercase">${session.type || 'audio'} Call</span>
-                                </div>
-                                <p class="text-[11px] text-gray-500">${session.user_phone || ''} • ₹${session.rate_per_min}/min</p>
-                                <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: ${session.seconds_elapsed || 0}s</p>
-                            </div>
-                        </div>
-                        <button onclick="triggerIncomingAlert(${session.seconds_left || 30})" class="px-3.5 py-2 rounded-xl bg-status-online hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
-                            <i data-lucide="phone" class="w-3.5 h-3.5"></i> Connect
-                        </button>
-                    </div>
-                `;
-            }
-        } else {
-            if (badge) {
-                badge.textContent = '0 Waiting';
-                badge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold';
-            }
-            if (cardCount) {
-                cardCount.textContent = '● 0 Devotees in Queue';
-                cardCount.className = 'text-[11px] text-gray-400 font-semibold mt-1';
-            }
-            if (queueContainer) {
-                queueContainer.innerHTML = `
-                    <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
-                        <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
-                        <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
-                        <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
-                    </div>
-                `;
-            }
-        }
-        if (window.lucide) lucide.createIcons();
+        // Queue UI removed cleanly; astrologer is alerted directly via Full-Screen Ringing Modal
     }
 
     function startPendingPoll() {
@@ -1273,9 +1208,8 @@ if ($currentAstro) {
                 const url = getApiEndpoint(`/sessions/pending.php?astrologer_id=${CURRENT_ASTRO_ID}&phone=${encodeURIComponent(CURRENT_ASTRO_PHONE)}`);
                 const res = await fetch(url);
                 const json = await res.json();
-                if (json.ok && json.data && json.data.has_incoming && json.data.session) {
+                if ((json.ok || json.success) && json.data && json.data.has_incoming && json.data.session) {
                     currentIncomingSession = json.data.session;
-                    renderQueueUI(currentIncomingSession);
                     
                     const uName = currentIncomingSession.user_name || 'பக்தர் (Devotee)';
                     document.getElementById('incomingDevoteeName').textContent = uName;
@@ -1283,6 +1217,39 @@ if ($currentAstro) {
                     if (avatarElem) avatarElem.textContent = (uName || 'DV').substring(0, 2).toUpperCase();
 
                     const phoneTag = document.getElementById('incomingDevoteePhone');
+                    if (phoneTag) {
+                        phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • நேரலை அழைப்பு விடுக்கப்பட்டுள்ளது';
+                    }
+
+                    const catTag = document.getElementById('incomingCallType');
+                    if (catTag) {
+                        catTag.textContent = (currentIncomingSession.type || 'audio').toUpperCase() + ' Call (₹' + currentIncomingSession.rate_per_min + '/m)';
+                    }
+
+                    const acceptBtn = document.getElementById('incomingAcceptBtn');
+                    if (acceptBtn) {
+                        acceptBtn.innerHTML = `<i data-lucide="phone" class="w-4 h-4"></i> Accept (₹${currentIncomingSession.rate_per_min}/m)`;
+                        if (window.lucide) lucide.createIcons();
+                    }
+
+                    triggerIncomingAlert(currentIncomingSession.seconds_left || 30);
+
+                    // Browser desktop notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        try {
+                            new Notification('🌟 பக்தர் நேரலை அழைப்பு! (Incoming Call)', {
+                                body: `${uName} (${(currentIncomingSession.type || 'audio').toUpperCase()} Call - ₹${currentIncomingSession.rate_per_min}/m)`,
+                                icon: '../assets/logo.jpg',
+                                requireInteraction: true
+                            });
+                        } catch (e) {}
+                    }
+                }
+            } catch (err) {
+                // background poll silent catch
+            }
+        }, 1000); // 1000ms for instant ringtone alert
+    }
                     if (phoneTag) {
                         phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • நேரலை அழைப்பு விடுக்கப்பட்டுள்ளது';
                     }
@@ -1403,7 +1370,7 @@ if ($currentAstro) {
                     const statusRes = await fetch(getApiEndpoint(`/sessions/check_status.php?session_id=${sid}`));
                     const statusData = await statusRes.json();
 
-                    if (statusData.ok && statusData.data) {
+                    if ((statusData.ok || statusData.success) && statusData.data) {
                         const curStatus = statusData.data.status;
                         if (curStatus === 'active') {
                             // Devotee Accepted! Room is created!
@@ -1456,7 +1423,7 @@ if ($currentAstro) {
                 } catch (e) {
                     // silent catch
                 }
-            }, 1000);
+            }, 800);
 
         } catch (e) {
             console.error('Accept error:', e);

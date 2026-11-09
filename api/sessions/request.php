@@ -97,9 +97,12 @@ if ($driver === 'sqlite') {
         `user_id` INT NOT NULL,
         `astrologer_id` INT NOT NULL,
         `type` ENUM('audio', 'video', 'chat') NOT NULL,
-        `status` ENUM('requested', 'active', 'completed', 'cancelled') DEFAULT 'requested',
+        `status` ENUM('requested', 'ringing_user', 'active', 'completed', 'cancelled') DEFAULT 'requested',
         `agora_channel` VARCHAR(100) NOT NULL,
+        `agora_user_token` TEXT NULL,
+        `agora_astro_token` TEXT NULL,
         `start_time` DATETIME NULL,
+        `user_accepted_at` DATETIME NULL,
         `end_time` DATETIME NULL,
         `duration_seconds` INT DEFAULT 0,
         `rate_per_min` DECIMAL(8, 2) NOT NULL,
@@ -113,6 +116,21 @@ if ($driver === 'sqlite') {
         INDEX (`status`)
     ) ENGINE=InnoDB");
 }
+
+// Cancel any stale requested session older than 45s for this user or astrologer
+try {
+    if ($driver === 'sqlite') {
+        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
+                      WHERE (user_id = ? OR astrologer_id = ?) 
+                        AND status IN ('requested', 'ringing_user') 
+                        AND created_at < datetime('now', '-45 seconds')")->execute([$userId, $astrologerId]);
+    } else {
+        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
+                      WHERE (user_id = ? OR astrologer_id = ?) 
+                        AND status IN ('requested', 'ringing_user') 
+                        AND created_at < DATE_SUB(NOW(), INTERVAL 45 SECOND)")->execute([$userId, $astrologerId]);
+    }
+} catch (\Throwable $t) {}
 
 $nowUtc = gmdate('Y-m-d H:i:s');
 $ins = $db->prepare("INSERT INTO consultation_sessions 
