@@ -4383,49 +4383,120 @@ class AstrologerActiveConsultationScreen extends StatefulWidget {
 class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveConsultationScreen> {
   int _secondsElapsed = 0;
   Timer? _sessionTimer;
+  Timer? _chatPollTimer;
+  Timer? _heartbeatTimer;
+  int _lastMsgId = 0;
   bool _isMuted = false;
   bool _isSpeaker = true;
   bool _isKundaliDrawerOpen = false;
 
   final TextEditingController _msgController = TextEditingController();
-  final List<Map<String, String>> _messages = [
-    {
-      'sender': 'astrologer',
-      'text': 'வணக்கம் கார்த்திக் அவர்களே! உங்கள் ஜாதகத்தை கவனித்து வருகிறேன். உங்கள் லக்கினம் துலாம், ராசி சிம்மம்.'
-    },
-    {
-      'sender': 'client',
-      'text': 'வணக்கம் ஐயா, எனக்கு திருமணம் எப்போது அமையும்? அரசு வேலை யோகம் உள்ளதா?'
-    },
-  ];
+  final ScrollController _scrollController = ScrollController();
+  final List<Map<String, String>> _messages = [];
 
   @override
   void initState() {
     super.initState();
-    // For unit tests / mock simulation, preserve 258s initial timer, for real calls start from 0
-    if (widget.sessionId == null) {
-      _secondsElapsed = 258;
-    }
+    _secondsElapsed = 0;
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() => _secondsElapsed++);
+    });
+
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      _fetchMessages();
+      _chatPollTimer = Timer.periodic(const Duration(milliseconds: 1000), (t) {
+        if (mounted) _fetchMessages();
+      });
+
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (t) async {
+        if (!mounted) return;
+        try {
+          await ApiService.post('/sessions/heartbeat.php', {'session_id': widget.sessionId});
+        } catch (_) {}
+      });
+    }
+  }
+
+  Future<void> _fetchMessages() async {
+    if (!mounted || widget.sessionId == null) return;
+    try {
+      final res = await ApiService.get(
+        '/chat/messages.php?session_id=${Uri.encodeComponent(widget.sessionId!)}&last_id=$_lastMsgId',
+      );
+      if (res['ok'] == true && res['data'] != null && res['data']['messages'] != null) {
+        final msgs = res['data']['messages'] as List;
+        if (msgs.isNotEmpty && mounted) {
+          setState(() {
+            for (var m in msgs) {
+              final id = m['id'] is int ? m['id'] as int : int.tryParse(m['id'].toString()) ?? 0;
+              if (id > _lastMsgId) _lastMsgId = id;
+              _messages.add({
+                'sender': m['sender_type'] == 'astrologer' ? 'astrologer' : 'client',
+                'text': m['content']?.toString() ?? '',
+              });
+            }
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
   @override
   void dispose() {
     _sessionTimer?.cancel();
+    _chatPollTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _msgController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage([String? quickText]) {
+  void _sendMessage([String? quickText]) async {
     final text = quickText ?? _msgController.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      _messages.add({'sender': 'astrologer', 'text': text});
-      if (quickText == null) _msgController.clear();
-    });
+    if (quickText == null) _msgController.clear();
+
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      try {
+        await ApiService.post('/chat/send.php', {
+          'session_id': widget.sessionId,
+          'sender_type': 'astrologer',
+          'sender_id': AstrologerState.numericId,
+          'content': text,
+        });
+        _fetchMessages();
+      } catch (_) {}
+    } else {
+      setState(() {
+        _messages.add({'sender': 'astrologer', 'text': text});
+      });
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _endConsultation() async {
+    _sessionTimer?.cancel();
+    _chatPollTimer?.cancel();
+    _heartbeatTimer?.cancel();
+    if (widget.sessionId != null) {
+      await ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   @override
@@ -4435,6 +4506,7 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
     final earnings = (_secondsElapsed * (AstrologerState.audioRate / 60)).toStringAsFixed(2);
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: AstroTheme.pineDark,
       appBar: AppBar(
         backgroundColor: AstroTheme.pine,
@@ -4484,15 +4556,15 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
                   border: Border.all(color: AstroTheme.borderGreen),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.badge, color: AstroTheme.royalGold, size: 20),
-                    SizedBox(width: 10),
+                  children: [
+                    const Icon(Icons.badge, color: AstroTheme.royalGold, size: 20),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Intake: 15-Aug-1996 • 10:30 AM • Chennai', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                          Text('Rasi: Simha (Magha) • Lagna: Thulam • Dasha: Guru-Budha', style: TextStyle(color: AstroTheme.textMint, fontSize: 10)),
+                          Text('Devotee: ${widget.clientName}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Type: ${widget.consultationType} • Session: ${widget.sessionId ?? "LIVE"}', style: const TextStyle(color: AstroTheme.textMint, fontSize: 10)),
                         ],
                       ),
                     ),
@@ -4502,28 +4574,37 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
 
               // Chat Thread
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  itemCount: _messages.length,
-                  itemBuilder: (ctx, idx) {
-                    final m = _messages[idx];
-                    final isAstro = m['sender'] == 'astrologer';
-                    return Align(
-                      alignment: isAstro ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.all(12),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                        decoration: BoxDecoration(
-                          color: isAstro ? AstroTheme.pine : AstroTheme.forestSurface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isAstro ? AstroTheme.royalGold.withAlpha(100) : AstroTheme.borderGreen),
+                child: _messages.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Live ${widget.consultationType} Connected.\nSend guidance or remedies to devotee.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
-                        child: Text(m['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        itemCount: _messages.length,
+                        itemBuilder: (ctx, idx) {
+                          final m = _messages[idx];
+                          final isAstro = m['sender'] == 'astrologer';
+                          return Align(
+                            alignment: isAstro ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(12),
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                              decoration: BoxDecoration(
+                                color: isAstro ? AstroTheme.pine : AstroTheme.forestSurface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: isAstro ? AstroTheme.royalGold.withAlpha(100) : AstroTheme.borderGreen),
+                              ),
+                              child: Text(m['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
 
               // Suggested Remedies Quick Chips
@@ -4541,64 +4622,54 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
                 ),
               ),
 
-              // Bottom Input Bar & End Consultation Button
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: AstroTheme.headerGreen,
-                  border: Border(top: BorderSide(color: AstroTheme.borderGreen)),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.red : Colors.white),
-                      onPressed: () => setState(() => _isMuted = !_isMuted),
-                    ),
-                    IconButton(
-                      icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: AstroTheme.royalGold),
-                      onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _msgController,
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                        decoration: InputDecoration(
-                          hintText: 'Type astrological guidance...',
-                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
-                          filled: true,
-                          fillColor: AstroTheme.forestSurface,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              // Bottom Input Bar & End Consultation Button (Wrapped with SafeArea to prevent keyboard overflow)
+              SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: const BoxDecoration(
+                    color: AstroTheme.headerGreen,
+                    border: Border(top: BorderSide(color: AstroTheme.borderGreen)),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.red : Colors.white),
+                        onPressed: () => setState(() => _isMuted = !_isMuted),
+                      ),
+                      IconButton(
+                        icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: AstroTheme.royalGold),
+                        onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _msgController,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          decoration: InputDecoration(
+                            hintText: 'Type astrological guidance...',
+                            hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                            filled: true,
+                            fillColor: AstroTheme.forestSurface,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.send, color: AstroTheme.royalGold),
-                      onPressed: () => _sendMessage(),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AstroTheme.statusDanger,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      IconButton(
+                        icon: const Icon(Icons.send, color: AstroTheme.royalGold),
+                        onPressed: () => _sendMessage(),
                       ),
-                      onPressed: () async {
-                        _sessionTimer?.cancel();
-                        if (widget.sessionId != null) {
-                          await ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
-                        }
-                        if (!mounted || !context.mounted) return;
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: AstroTheme.statusOnline,
-                            content: Text('Consultation completed! ₹$earnings credited to your Astrologer Wallet.'),
-                          ),
-                        );
-                      },
-                      child: const Text('End', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
-                    ),
-                  ],
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AstroTheme.statusDanger,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _endConsultation,
+                        child: const Text('End', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
