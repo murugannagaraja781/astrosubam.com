@@ -16,6 +16,7 @@ class Response {
 
         echo json_encode([
             'success'   => $success,
+            'ok'        => $success,
             'message'   => $message,
             'data'      => $data,
             'timestamp' => time()
@@ -24,9 +25,15 @@ class Response {
     }
 
     public static function getJsonInput(): array {
+        if (!empty($_POST)) {
+            return $_POST;
+        }
+        if (php_sapi_name() === 'cli' && empty($_SERVER['HTTP_HOST'])) {
+            return [];
+        }
         $raw = file_get_contents('php://input');
         if (empty($raw)) {
-            return $_POST;
+            return [];
         }
         $data = json_decode($raw, true);
         return is_array($data) ? $data : [];

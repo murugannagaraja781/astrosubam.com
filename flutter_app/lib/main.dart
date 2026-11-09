@@ -1986,6 +1986,47 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
       'text': 'Vanakkam! I am Guruji. Please share your Date, Time, and Place of Birth to begin the chart analysis.',
     }
   ];
+  Timer? _chatTimer;
+  int _lastMsgId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startChatPolling();
+  }
+
+  @override
+  void dispose() {
+    _chatTimer?.cancel();
+    _msgController.dispose();
+    super.dispose();
+  }
+
+  void _startChatPolling() {
+    if (widget.sessionId == null || widget.sessionId!.isEmpty) return;
+    _chatTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+      try {
+        final res = await ApiService.get('/chat/messages.php?session_id=${widget.sessionId}&last_id=$_lastMsgId');
+        if (res['ok'] == true && res['data'] != null && res['data']['messages'] != null) {
+          final msgs = res['data']['messages'] as List;
+          if (msgs.isNotEmpty && mounted) {
+            setState(() {
+              for (var m in msgs) {
+                final id = m['id'] is int ? m['id'] as int : int.tryParse(m['id'].toString()) ?? 0;
+                if (id > _lastMsgId) _lastMsgId = id;
+                if (m['sender_type'] == 'astrologer') {
+                  _messages.add({
+                    'sender': 'astro',
+                    'text': m['content']?.toString() ?? '',
+                  });
+                }
+              }
+            });
+          }
+        }
+      } catch (_) {}
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2080,20 +2121,23 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                 IconButton(
                   style: IconButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
                   icon: const Icon(Icons.send),
-                  onPressed: () {
+                  onPressed: () async {
                     final text = _msgController.text.trim();
                     if (text.isNotEmpty) {
                       setState(() {
                         _messages.add({'sender': 'user', 'text': text});
                         _msgController.clear();
                       });
-                      Future.delayed(const Duration(seconds: 1), () {
-                        if (mounted) {
-                          setState(() {
-                            _messages.add({'sender': 'astro', 'text': 'Noted! Analyzing planetary transits in 10th & 7th house for auspicious outcome...'});
+                      if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+                        try {
+                          await ApiService.post('/chat/send.php', {
+                            'session_id': widget.sessionId,
+                            'sender_type': 'user',
+                            'sender_id': UserState.userId,
+                            'content': text,
                           });
-                        }
-                      });
+                        } catch (_) {}
+                      }
                     }
                   },
                 ),

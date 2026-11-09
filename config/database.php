@@ -133,6 +133,17 @@ try {
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 )");
 
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `chat_messages` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `session_id` TEXT NOT NULL,
+                    `sender_type` TEXT NOT NULL,
+                    `sender_id` INTEGER NOT NULL,
+                    `message_type` TEXT DEFAULT 'text',
+                    `content` TEXT NOT NULL,
+                    `file_url` TEXT NULL,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+
                 // Seed test user and astrologer if empty
                 $cnt = $pdo->query("SELECT COUNT(*) FROM astrologers")->fetchColumn();
                 if ($cnt == 0) {

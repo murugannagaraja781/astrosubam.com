@@ -114,10 +114,11 @@ if ($driver === 'sqlite') {
     ) ENGINE=InnoDB");
 }
 
+$nowUtc = gmdate('Y-m-d H:i:s');
 $ins = $db->prepare("INSERT INTO consultation_sessions 
-    (session_id, user_id, astrologer_id, type, status, agora_channel, rate_per_min) 
-    VALUES (?, ?, ?, ?, 'requested', ?, ?)");
-$ins->execute([$sessionId, $userId, $astrologerId, $type, $channelName, $rate]);
+    (session_id, user_id, astrologer_id, type, status, agora_channel, rate_per_min, created_at) 
+    VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)");
+$ins->execute([$sessionId, $userId, $astrologerId, $type, $channelName, $rate, $nowUtc]);
 
 Response::json(true, "Consultation request placed! Ringing astrologer...", [
     'session_id'          => $sessionId,

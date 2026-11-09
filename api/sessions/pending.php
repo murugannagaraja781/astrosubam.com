@@ -2,12 +2,16 @@
 // api/sessions/pending.php - Astrologer checks for incoming consultation requests
 declare(strict_types=1);
 
+if (session_status() === PHP_SESSION_NONE) {
+    @session_start();
+}
+
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/Response.php';
 
 $input = Response::getJsonInput();
-$astroId = (int)($input['astrologer_id'] ?? ($_GET['astrologer_id'] ?? 0));
-$astroPhone = trim($input['phone'] ?? ($_GET['phone'] ?? ''));
+$astroId = (int)($input['astrologer_id'] ?? ($_GET['astrologer_id'] ?? ($_SESSION['astrologer_id'] ?? 0)));
+$astroPhone = trim($input['phone'] ?? ($_GET['phone'] ?? ($_SESSION['astrologer_phone'] ?? '')));
 
 $db = getDb();
 
@@ -18,36 +22,48 @@ if ($astroId <= 0 && !empty($astroPhone)) {
 }
 
 if ($astroId <= 0) {
-    // Default to first astrologer (Guruji Sundaramurthy)
+    // Fallback to first astrologer
     $astroId = 1;
 }
 
-// Find pending sessions created within the last 45 seconds
-$driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
-
-if ($driver === 'sqlite') {
-    $stmt = $db->prepare("SELECT s.*, u.name as user_name, u.phone as user_phone,
-        (strftime('%s', 'now') - strftime('%s', s.created_at)) as seconds_elapsed
-        FROM consultation_sessions s
-        LEFT JOIN users u ON s.user_id = u.id
-        WHERE s.astrologer_id = ? AND s.status = 'requested'
-        AND (strftime('%s', 'now') - strftime('%s', s.created_at)) <= 45
-        ORDER BY s.id DESC LIMIT 1");
-} else {
-    $stmt = $db->prepare("SELECT s.*, u.name as user_name, u.phone as user_phone,
-        TIMESTAMPDIFF(SECOND, s.created_at, NOW()) as seconds_elapsed
-        FROM consultation_sessions s
-        LEFT JOIN users u ON s.user_id = u.id
-        WHERE s.astrologer_id = ? AND s.status = 'requested'
-        AND TIMESTAMPDIFF(SECOND, s.created_at, NOW()) <= 45
-        ORDER BY s.id DESC LIMIT 1");
-}
+// Find pending sessions with status='requested' for this astrologer
+$stmt = $db->prepare("SELECT s.*, u.name as user_name, u.phone as user_phone
+    FROM consultation_sessions s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.astrologer_id = ? AND s.status = 'requested'
+    ORDER BY s.id DESC LIMIT 1");
 
 $stmt->execute([$astroId]);
 $pending = $stmt->fetch();
 
 if (!$pending) {
     Response::json(true, 'No incoming consultations at this moment.', [
+        'has_incoming' => false
+    ]);
+}
+
+// Calculate elapsed seconds safely with UTC & Local normalization
+$createdAtStr = (string)($pending['created_at'] ?? '');
+$now = time();
+$parsedUtc = !empty($createdAtStr) ? strtotime($createdAtStr . ' UTC') : $now;
+$parsedLocal = !empty($createdAtStr) ? strtotime($createdAtStr) : $now;
+
+$diffUtc = $now - $parsedUtc;
+$diffLocal = $now - $parsedLocal;
+
+$secondsElapsed = 0;
+if ($diffUtc >= 0 && $diffUtc < 3600) {
+    $secondsElapsed = $diffUtc;
+} elseif ($diffLocal >= 0 && $diffLocal < 3600) {
+    $secondsElapsed = $diffLocal;
+} else {
+    $secondsElapsed = max(0, min(abs($diffUtc), abs($diffLocal)));
+}
+
+// If request is older than 45 seconds and still pending, auto-cancel it
+if ($secondsElapsed > 45) {
+    $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' WHERE id = ?")->execute([$pending['id']]);
+    Response::json(true, 'Consultation request timed out.', [
         'has_incoming' => false
     ]);
 }
@@ -64,9 +80,8 @@ Response::json(true, 'Incoming consultation detected!', [
         'user_id'         => (int)$pending['user_id'],
         'user_name'       => $uName,
         'user_phone'      => $pending['user_phone'] ?? '8000000001',
-        'seconds_elapsed' => (int)($pending['seconds_elapsed'] ?? 0),
-        'seconds_left'    => max(0, 30 - (int)($pending['seconds_elapsed'] ?? 0)),
+        'seconds_elapsed' => $secondsElapsed,
+        'seconds_left'    => max(1, 30 - $secondsElapsed),
         'created_at'      => $pending['created_at']
     ]
 ]);
-

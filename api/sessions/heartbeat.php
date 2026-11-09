@@ -15,8 +15,11 @@ $db = getDb();
 $db->beginTransaction();
 
 try {
+    $isSqlite = ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite');
+    $forUpdate = $isSqlite ? '' : ' FOR UPDATE';
+
     $stmt = $db->prepare("SELECT id, user_id, astrologer_id, rate_per_min, status, total_deducted, duration_seconds 
-                          FROM consultation_sessions WHERE session_id = ? FOR UPDATE");
+                          FROM consultation_sessions WHERE session_id = ?" . $forUpdate);
     $stmt->execute([$sessionId]);
     $session = $stmt->fetch();
 
@@ -29,7 +32,7 @@ try {
     $rate = (float)$session['rate_per_min'];
 
     // Check user current balance
-    $uStmt = $db->prepare("SELECT wallet_balance FROM users WHERE id = ? FOR UPDATE");
+    $uStmt = $db->prepare("SELECT wallet_balance FROM users WHERE id = ?" . $forUpdate);
     $uStmt->execute([$userId]);
     $user = $uStmt->fetch();
 

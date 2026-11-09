@@ -8,6 +8,7 @@
 deploy_subam.zip
 
 # Build artifacts & OS files
+.vscode/
 *.apk
 *.sqlite
 database/*.sqlite

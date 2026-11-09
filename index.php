@@ -1040,7 +1040,7 @@ try {
         // ==============================================
         // CONSULTATION LOGIC & 5-MIN SAFEGUARD
         // ==============================================
-        function startConsultation(astroId, type, ratePerMin, name = 'Guruji') {
+        async function startConsultation(astroId, type, ratePerMin, name = 'Guruji') {
             const minRequired = ratePerMin * 5; // 5-minute safeguard threshold
             if (AppState.walletBalance < minRequired) {
                 alert(`⚠️ குறைந்தபட்ச இருப்பு எச்சரிக்கை!\n\n5 நிமிட ஆலோசனைக்கு குறைந்தபட்சம் ₹${minRequired} இருப்பு தேவை.\nஉங்கள் தற்போதைய வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(0)}.\n\nஉடனடியாக வாலட் ரீசார்ஜ் செய்யவும்.`);
@@ -1048,17 +1048,50 @@ try {
                 return;
             }
 
-            if (type === 'Chat') {
-                openChatModal(name, ratePerMin);
-            } else {
-                openCallModal(name, type, ratePerMin);
+            // Real backend consultation request
+            try {
+                const reqRes = await fetch('api/sessions/request.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: 2,
+                        astrologer_id: astroId,
+                        type: (type || 'audio').toLowerCase(),
+                        user_name: AppState.userName || 'பக்தர் (Web User)',
+                        user_phone: '8000000001'
+                    })
+                });
+                const reqData = await reqRes.json();
+                if (reqData.ok && reqData.data && reqData.data.session_id) {
+                    const sid = reqData.data.session_id;
+                    if (type === 'Chat') {
+                        openChatModal(name, ratePerMin, sid, astroId);
+                    } else {
+                        openCallModal(name, type, ratePerMin, sid, astroId);
+                    }
+                    return;
+                } else {
+                    alert(reqData.message || 'ஜோதிடரை இணைக்க முடியவில்லை. சிறிது நேரம் கழித்து முயற்சிக்கவும்.');
+                    return;
+                }
+            } catch (e) {
+                console.warn('Backend call initiate error:', e);
+                if (type === 'Chat') {
+                    openChatModal(name, ratePerMin);
+                } else {
+                    openCallModal(name, type, ratePerMin);
+                }
             }
         }
 
         // ==============================================
-        // CALL SIMULATOR WITH 60-SEC HEARTBEAT BILLING
+        // CALL LIFECYCLE WITH REAL 2-WAY HANDSHAKE & BILLING
         // ==============================================
-        function openCallModal(name, type, rate) {
+        let callPollTimer = null;
+        let currentCallSessionId = null;
+
+        function openCallModal(name, type, rate, sessionId = null, astroId = 1) {
+            currentCallSessionId = sessionId;
             AppState.activeCall.astroName = name;
             AppState.activeCall.type = type;
             AppState.activeCall.ratePerMin = rate;
@@ -1066,7 +1099,7 @@ try {
             AppState.activeCall.deducted = 0.0;
 
             document.getElementById('call-astro-name').innerText = name;
-            document.getElementById('call-type-title').innerText = `Agora RTC Live ${type} Call`;
+            document.getElementById('call-type-title').innerText = sessionId ? `Ringing Guruji... (${type} Call)` : `Agora RTC Live ${type} Call`;
             document.getElementById('call-rate-desc').innerText = `₹${rate} / நிமிடம் • Agora RTC Encrypted Channel`;
             document.getElementById('call-deducted-amt').innerText = '₹0.00';
             document.getElementById('call-timer').innerText = '00:00';
@@ -1083,9 +1116,54 @@ try {
             }
 
             updateWalletUI();
-
             document.getElementById('call-modal').classList.remove('hidden');
 
+            if (callPollTimer) clearInterval(callPollTimer);
+            if (AppState.activeCall.timer) clearInterval(AppState.activeCall.timer);
+            if (AppState.activeCall.billingTimer) clearInterval(AppState.activeCall.billingTimer);
+
+            // If connected via real backend session: Poll for astrologer acceptance
+            if (sessionId) {
+                callPollTimer = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`api/sessions/check_status.php?session_id=${sessionId}`);
+                        const statusData = await statusRes.json();
+                        if (statusData.ok && statusData.data) {
+                            const curStatus = statusData.data.status;
+                            if (curStatus === 'ringing_user') {
+                                // Astrologer accepted! User auto-accepts to start live room!
+                                clearInterval(callPollTimer);
+                                callPollTimer = null;
+
+                                await fetch('api/sessions/user_accept.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ session_id: sessionId, user_id: 2 })
+                                });
+
+                                document.getElementById('call-type-title').innerText = `Live Connected (${type} Call)`;
+                                startCallLiveTimers(sessionId);
+                            } else if (curStatus === 'active') {
+                                clearInterval(callPollTimer);
+                                callPollTimer = null;
+                                document.getElementById('call-type-title').innerText = `Live Connected (${type} Call)`;
+                                startCallLiveTimers(sessionId);
+                            } else if (curStatus === 'cancelled') {
+                                clearInterval(callPollTimer);
+                                callPollTimer = null;
+                                document.getElementById('call-modal').classList.add('hidden');
+                                alert('ஜோதிடர் தற்போது அழைப்பை ஏற்க இயலவில்லை அல்லது ரத்து செய்யப்பட்டது (Astrologer declined or timed out).');
+                            }
+                        }
+                    } catch (e) {}
+                }, 1200);
+            } else {
+                // Local simulation fallback
+                startCallLiveTimers(null);
+            }
+        }
+
+        function startCallLiveTimers(sessionId) {
             // 1-second display timer
             AppState.activeCall.timer = setInterval(() => {
                 AppState.activeCall.seconds++;
@@ -1095,12 +1173,27 @@ try {
             }, 1000);
 
             // 60-second real-time wallet deduction heartbeat
-            AppState.activeCall.billingTimer = setInterval(() => {
+            AppState.activeCall.billingTimer = setInterval(async () => {
                 if (AppState.walletBalance >= AppState.activeCall.ratePerMin) {
                     AppState.walletBalance -= AppState.activeCall.ratePerMin;
                     AppState.activeCall.deducted += AppState.activeCall.ratePerMin;
                     document.getElementById('call-deducted-amt').innerText = '₹' + AppState.activeCall.deducted.toFixed(2);
                     updateWalletUI();
+
+                    if (sessionId) {
+                        try {
+                            const hbRes = await fetch('api/sessions/heartbeat.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ session_id: sessionId })
+                            });
+                            const hbData = await hbRes.json();
+                            if (hbData.data && hbData.data.terminate) {
+                                alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! ஆலோசனை தானாக நிறைவு பெறுகிறது.');
+                                endLiveCall();
+                            }
+                        } catch (e) {}
+                    }
                 } else {
                     alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! ஆலோசனை தானாக நிறைவு பெறுகிறது.');
                     endLiveCall();
@@ -1108,12 +1201,23 @@ try {
             }, 60000);
         }
 
-        function endLiveCall() {
+        async function endLiveCall() {
+            if (callPollTimer) clearInterval(callPollTimer);
             clearInterval(AppState.activeCall.timer);
             clearInterval(AppState.activeCall.billingTimer);
-            const durationMins = Math.ceil(AppState.activeCall.seconds / 60) || 1;
-            document.getElementById('call-modal').classList.add('hidden');
 
+            if (currentCallSessionId) {
+                try {
+                    await fetch('api/sessions/end.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: currentCallSessionId, rating: 5 })
+                    });
+                } catch (e) {}
+                currentCallSessionId = null;
+            }
+
+            document.getElementById('call-modal').classList.add('hidden');
             alert(`✅ ஆலோசனை நிறைவடைந்தது!\n\nகால அளவு: ${AppState.activeCall.seconds} விநாடிகள்\nபிடிக்கப்பட்ட கட்டணம்: ₹${AppState.activeCall.deducted.toFixed(2)}\nமீதமுள்ள வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\n\nகுருஜியின் தெய்வீக அருள் நிலைக்கட்டும்! 🌟`);
         }
 
@@ -1142,19 +1246,118 @@ try {
         }
 
         // ==============================================
-        // CHAT CONSULTATION MODAL LOGIC
+        // CHAT CONSULTATION MODAL LOGIC - REAL 2-WAY SYNC
         // ==============================================
-        function openChatModal(name, rate) {
+        let currentChatSessionId = null;
+        let chatPollTimer = null;
+        let chatStatusPollTimer = null;
+        let lastWebChatMsgId = 0;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function openChatModal(name, rate, sessionId = null, astroId = 1) {
+            currentChatSessionId = sessionId;
+            lastWebChatMsgId = 0;
             document.getElementById('chat-astro-name').innerText = name;
             document.getElementById('chat-rate-val').innerText = rate;
+
+            // Clean chat container with astrologer welcome
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = `
+                <div class="flex items-start gap-2 max-w-[85%]">
+                    <div class="w-7 h-7 rounded-lg bg-astro-surface border border-astro-gold/40 flex items-center justify-center text-astro-gold text-xs font-bold flex-shrink-0">
+                        ॐ
+                    </div>
+                    <div class="bg-astro-surface border border-astro-emerald/30 p-3 rounded-2xl rounded-tl-none text-xs text-white/90 leading-relaxed font-tamil">
+                        வணக்கம்! நான் ${escapeHtml(name)}. தங்களின் பிறப்பு தேதி (DOB), பிறந்த நேரம் (Time) மற்றும் பிறந்த ஊர் (Place of birth) பகிருங்கள். ஜாதகத்தை கணித்து விடை தருகிறேன்.
+                    </div>
+                </div>
+            `;
             document.getElementById('chat-modal').classList.remove('hidden');
+
+            if (chatPollTimer) clearInterval(chatPollTimer);
+            if (chatStatusPollTimer) clearInterval(chatStatusPollTimer);
+
+            if (sessionId) {
+                // Poll session handshake
+                chatStatusPollTimer = setInterval(async () => {
+                    try {
+                        const sRes = await fetch(`api/sessions/check_status.php?session_id=${sessionId}`);
+                        const sData = await sRes.json();
+                        if (sData.ok && sData.data) {
+                            const status = sData.data.status;
+                            if (status === 'ringing_user') {
+                                await fetch('api/sessions/user_accept.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ session_id: sessionId, user_id: 2 })
+                                });
+                            }
+                        }
+                    } catch (e) {}
+                }, 1200);
+
+                // Incremental chat messages poller
+                chatPollTimer = setInterval(async () => {
+                    try {
+                        const res = await fetch(`api/chat/messages.php?session_id=${encodeURIComponent(sessionId)}&last_id=${lastWebChatMsgId}`);
+                        const data = await res.json();
+                        if (data.ok && data.data && data.data.messages && data.data.messages.length > 0) {
+                            data.data.messages.forEach(msg => {
+                                const id = parseInt(msg.id);
+                                if (id > lastWebChatMsgId) {
+                                    lastWebChatMsgId = id;
+                                }
+                                if (msg.sender_type === 'astrologer') {
+                                    appendAstrologerChatBubble(msg.content);
+                                }
+                            });
+                        }
+                    } catch (e) {}
+                }, 1200);
+            }
+        }
+
+        function appendAstrologerChatBubble(text) {
+            const container = document.getElementById('chat-messages');
+            if (!container) return;
+            const reply = document.createElement('div');
+            reply.className = 'flex items-start gap-2 max-w-[85%]';
+            reply.innerHTML = `
+                <div class="w-7 h-7 rounded-lg bg-astro-surface border border-astro-gold/40 flex items-center justify-center text-astro-gold text-xs font-bold flex-shrink-0">
+                    ॐ
+                </div>
+                <div class="bg-astro-surface border border-astro-emerald/30 p-3 rounded-2xl rounded-tl-none text-xs text-white/90 leading-relaxed font-tamil">
+                    ${escapeHtml(text)}
+                </div>
+            `;
+            container.appendChild(reply);
+            container.scrollTop = container.scrollHeight;
         }
 
         function closeChatModal() {
+            if (chatPollTimer) clearInterval(chatPollTimer);
+            if (chatStatusPollTimer) clearInterval(chatStatusPollTimer);
+            if (currentChatSessionId) {
+                fetch('api/sessions/end.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentChatSessionId, rating: 5 })
+                }).catch(() => {});
+                currentChatSessionId = null;
+            }
             document.getElementById('chat-modal').classList.add('hidden');
         }
 
-        function sendChatMessage(e) {
+        async function sendChatMessage(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
@@ -1162,33 +1365,34 @@ try {
 
             const container = document.getElementById('chat-messages');
 
-            // Append user message
+            // Append user message immediately
             const userMsg = document.createElement('div');
             userMsg.className = 'flex items-start justify-end gap-2';
             userMsg.innerHTML = `
                 <div class="bg-astro-gold text-astro-base font-medium p-3 rounded-2xl rounded-tr-none text-xs max-w-[85%] leading-relaxed font-tamil">
-                    ${text}
+                    ${escapeHtml(text)}
                 </div>
             `;
             container.appendChild(userMsg);
             input.value = '';
             container.scrollTop = container.scrollHeight;
 
-            // Astrologer simulated reply
-            setTimeout(() => {
-                const reply = document.createElement('div');
-                reply.className = 'flex items-start gap-2 max-w-[85%]';
-                reply.innerHTML = `
-                    <div class="w-7 h-7 rounded-lg bg-astro-surface border border-astro-gold/40 flex items-center justify-center text-astro-gold text-xs font-bold flex-shrink-0">
-                        ॐ
-                    </div>
-                    <div class="bg-astro-surface border border-astro-emerald/30 p-3 rounded-2xl rounded-tl-none text-xs text-white/90 leading-relaxed font-tamil">
-                        குறிப்பெடுத்துக் கொண்டேன். உங்கள் 10-ஆம் மற்றும் 7-ஆம் இட கிரக சஞ்சார நிலைகளை கணித்து நற்பலன்களை உடனே கூறுகிறேன்...
-                    </div>
-                `;
-                container.appendChild(reply);
-                container.scrollTop = container.scrollHeight;
-            }, 1200);
+            if (currentChatSessionId) {
+                try {
+                    await fetch('api/chat/send.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: currentChatSessionId,
+                            sender_type: 'user',
+                            sender_id: 2,
+                            content: text
+                        })
+                    });
+                } catch (e) {
+                    console.error('Error sending user chat:', e);
+                }
+            }
         }
 
         // ==============================================

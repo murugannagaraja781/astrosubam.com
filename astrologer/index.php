@@ -130,28 +130,28 @@ if ($currentAstro && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch Real Data for Dashboard
-$totalEarnings = 4250.0;
-$totalConsultations = 14;
+// Fetch Real Data for Dashboard (No Mock Data)
+$totalEarnings = 0.0;
+$totalConsultations = 0;
 $recentConsultations = [];
 
 if ($currentAstro) {
     try {
-        $eStmt = $db->prepare("SELECT SUM(astrologer_share) as total_earned, COUNT(*) as total_calls FROM consultation_sessions WHERE astrologer_id = ? AND status = 'completed'");
+        $eStmt = $db->prepare("SELECT COALESCE(SUM(astrologer_share), 0) as total_earned, COUNT(*) as total_calls FROM consultation_sessions WHERE astrologer_id = ? AND status = 'completed'");
         $eStmt->execute([$astrologerId]);
         $stats = $eStmt->fetch();
-        if ($stats && $stats['total_calls'] > 0) {
-            $totalEarnings = (float)$stats['total_earned'];
-            $totalConsultations = (int)$stats['total_calls'];
+        if ($stats) {
+            $totalEarnings = (float)($stats['total_earned'] ?? 0.0);
+            $totalConsultations = (int)($stats['total_calls'] ?? 0);
         }
 
         $hStmt = $db->prepare("SELECT s.*, u.name as user_name, u.phone as user_phone 
                                FROM consultation_sessions s 
-                               JOIN users u ON s.user_id = u.id 
+                               LEFT JOIN users u ON s.user_id = u.id 
                                WHERE s.astrologer_id = ? 
                                ORDER BY s.id DESC LIMIT 10");
         $hStmt->execute([$astrologerId]);
-        $recentConsultations = $hStmt->fetchAll();
+        $recentConsultations = $hStmt->fetchAll() ?: [];
     } catch (\Throwable $t) {}
 }
 ?>
@@ -370,9 +370,6 @@ if ($currentAstro) {
                         <button onclick="toggleChatOnline(this)" id="btnChatStatus" class="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1.5 transition">
                             <i data-lucide="message-square" class="w-3.5 h-3.5"></i> Chat: Online
                         </button>
-                        <button onclick="triggerIncomingAlert()" class="px-3 py-1.5 rounded-lg text-gold-amber hover:text-gold flex items-center gap-1.5 transition font-bold" title="Test Incoming Call Alert">
-                            <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i> Test Alert
-                        </button>
                     </div>
 
                     <!-- Theme Toggle -->
@@ -421,12 +418,12 @@ if ($currentAstro) {
                     <div class="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition">
                         <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                             <span>Today's Earnings</span>
-                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold">+18% vs yesterday</span>
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold">80% Astrologer Share</span>
                         </div>
                         <div class="mt-2 flex items-baseline gap-1">
                             <span class="font-cinzel text-2xl sm:text-3xl font-bold text-pine dark:text-gold">₹<?= number_format($totalEarnings, 2) ?></span>
                         </div>
-                        <p class="text-[11px] text-gray-400 mt-1">Net Share (80% Disbursable)</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Net Disbursable Share</p>
                     </div>
 
                     <!-- Card 2: Consultations -->
@@ -439,7 +436,7 @@ if ($currentAstro) {
                             <span class="font-cinzel text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white"><?= $totalConsultations ?></span>
                             <span class="text-xs text-gray-400 font-semibold">Completed</span>
                         </div>
-                        <p class="text-[11px] text-status-online font-semibold mt-1">● 2 Devotees in Queue</p>
+                        <p class="text-[11px] text-gray-400 font-semibold mt-1" id="cardQueueCount">● 0 Devotees in Queue</p>
                     </div>
 
                     <!-- Card 3: Rating -->
@@ -568,34 +565,28 @@ if ($currentAstro) {
                                     <th class="p-2.5">Action</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-white/5">
-                                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                                    <td class="p-2.5 text-gray-500">Today, 02:40 PM</td>
-                                    <td class="p-2.5 font-bold text-slate-800 dark:text-white">Rahul S.</td>
-                                    <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-pine/10 text-pine dark:text-gold text-[10px] font-bold uppercase">Audio</span></td>
-                                    <td class="p-2.5">15 mins</td>
-                                    <td class="p-2.5 font-bold text-status-online">+ ₹240.00</td>
-                                    <td class="p-2.5 text-gold-amber font-bold">5.0 ⭐</td>
-                                    <td class="p-2.5"><button onclick="openKundaliModal()" class="text-[10px] font-bold text-pine dark:text-gold hover:underline">View Chart</button></td>
-                                </tr>
-                                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                                    <td class="p-2.5 text-gray-500">Today, 11:15 AM</td>
-                                    <td class="p-2.5 font-bold text-slate-800 dark:text-white">Meena Kumari</td>
-                                    <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 text-[10px] font-bold uppercase">Video</span></td>
-                                    <td class="p-2.5">22 mins</td>
-                                    <td class="p-2.5 font-bold text-status-online">+ ₹616.00</td>
-                                    <td class="p-2.5 text-gold-amber font-bold">5.0 ⭐</td>
-                                    <td class="p-2.5"><button onclick="openKundaliModal()" class="text-[10px] font-bold text-pine dark:text-gold hover:underline">View Chart</button></td>
-                                </tr>
-                                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                                    <td class="p-2.5 text-gray-500">Yesterday, 07:20 PM</td>
-                                    <td class="p-2.5 font-bold text-slate-800 dark:text-white">Anand Kumar</td>
-                                    <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-600 text-[10px] font-bold uppercase">Chat</span></td>
-                                    <td class="p-2.5">12 mins</td>
-                                    <td class="p-2.5 font-bold text-status-online">+ ₹96.00</td>
-                                    <td class="p-2.5 text-gold-amber font-bold">4.8 ⭐</td>
-                                    <td class="p-2.5"><button onclick="openKundaliModal()" class="text-[10px] font-bold text-pine dark:text-gold hover:underline">View Chart</button></td>
-                                </tr>
+                            <tbody class="divide-y divide-gray-100 dark:divide-white/5" id="recentConsultationsTbody">
+                                <?php if (empty($recentConsultations)): ?>
+                                    <tr>
+                                        <td colspan="7" class="p-6 text-center text-gray-400 dark:text-gray-500 text-xs">
+                                            இன்னும் ஆலோசனைகள் எதுவும் நடைபெறவில்லை (No consultation records yet)
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($recentConsultations as $rc): ?>
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition">
+                                            <td class="p-2.5 text-gray-500"><?= htmlspecialchars(date('d M, h:i A', strtotime($rc['created_at'] ?? 'now'))) ?></td>
+                                            <td class="p-2.5 font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($rc['user_name'] ?? 'பக்தர்') ?></td>
+                                            <td class="p-2.5">
+                                                <span class="px-2 py-0.5 rounded <?= ($rc['type'] === 'video') ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600' : (($rc['type'] === 'chat') ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600' : 'bg-pine/10 text-pine dark:text-gold') ?> text-[10px] font-bold uppercase"><?= htmlspecialchars(strtoupper($rc['type'] ?? 'AUDIO')) ?></span>
+                                            </td>
+                                            <td class="p-2.5"><?= max(1, ceil(((int)($rc['duration_seconds'] ?? 0)) / 60)) ?> mins</td>
+                                            <td class="p-2.5 font-bold text-status-online">+ ₹<?= number_format((float)($rc['astrologer_share'] ?? 0), 2) ?></td>
+                                            <td class="p-2.5 text-gold-amber font-bold"><?= !empty($rc['rating']) ? number_format((float)$rc['rating'], 1) . ' ⭐' : '5.0 ⭐' ?></td>
+                                            <td class="p-2.5"><button onclick="openKundaliModal('<?= addslashes($rc['user_name'] ?? 'பக்தர்') ?>')" class="text-[10px] font-bold text-pine dark:text-gold hover:underline">View Chart</button></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -610,15 +601,15 @@ if ($currentAstro) {
                     <!-- Top Bar with MM:SS Timer & Real-time Earnings Ticker -->
                     <div class="p-4 bg-pine dark:bg-[#162B2B] text-white flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center font-bold text-gold text-sm border border-gold">
-                                KR
+                            <div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center font-bold text-gold text-sm border border-gold" id="activeDevoteeAvatar">
+                                DV
                             </div>
                             <div>
                                 <div class="flex items-center gap-2">
-                                    <h3 class="font-bold text-sm" id="activeClientName">Karthik R. (Devotee)</h3>
-                                    <span class="px-2 py-0.5 bg-status-online text-white rounded text-[9px] font-bold uppercase">In-Session</span>
+                                    <h3 class="font-bold text-sm" id="activeClientName">பக்தர் (Devotee)</h3>
+                                    <span class="px-2 py-0.5 bg-status-online text-white rounded text-[9px] font-bold uppercase" id="activeCallBadge">IN-SESSION</span>
                                 </div>
-                                <p class="text-[11px] text-gray-300">DOB: 15-Aug-1996 • 10:30 AM • Chennai • Simha Rasi</p>
+                                <p class="text-[11px] text-gray-300" id="activeClientSub">Live Vedic Consultation Session</p>
                             </div>
                         </div>
 
@@ -626,12 +617,12 @@ if ($currentAstro) {
                             <!-- Consultation Timer -->
                             <div class="text-right">
                                 <p class="text-[10px] text-gray-300">Call Duration</p>
-                                <p class="font-mono text-lg font-bold text-gold" id="consultationTimer">04:18</p>
+                                <p class="font-mono text-lg font-bold text-gold" id="consultationTimer">00:00</p>
                             </div>
                             <!-- Dynamic Earnings Ticker -->
                             <div class="text-right bg-white/10 px-3 py-1.5 rounded-xl border border-white/20">
                                 <p class="text-[10px] text-gray-300">Current Earnings</p>
-                                <p class="font-mono text-base font-bold text-gold" id="liveEarningsTicker">₹ 147.00</p>
+                                <p class="font-mono text-base font-bold text-gold" id="liveEarningsTicker">₹ 0.00</p>
                             </div>
                             <!-- Quick-Tool Pill: View Kundali Drawer -->
                             <button onclick="toggleKundaliDrawer()" class="px-3.5 py-2 rounded-xl bg-gold text-pine-dark font-bold text-xs shadow-md hover:bg-gold-amber transition flex items-center gap-1.5">
@@ -644,38 +635,13 @@ if ($currentAstro) {
                     <div class="flex-1 flex overflow-hidden relative">
                         <!-- Main Chat Area -->
                         <div class="flex-1 flex flex-col p-4 overflow-y-auto space-y-4 custom-scrollbar bg-[#F8F9FA] dark:bg-[#121212]" id="chatMessages">
-                            <!-- Intake Form Display -->
-                            <div class="max-w-md mx-auto p-4 bg-white dark:bg-[#1A1A1A] border border-gold/40 rounded-2xl shadow-sm text-xs">
-                                <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-white/10">
-                                    <span class="font-bold text-pine dark:text-gold flex items-center gap-1.5"><i data-lucide="clipboard-check" class="w-4 h-4"></i> Client Intake Details (பிறப்பு விபரம்)</span>
-                                    <span class="text-[10px] text-status-online font-bold">VERIFIED</span>
+                            <!-- Live Connection Welcome Notice -->
+                            <div class="max-w-md mx-auto p-4 bg-white dark:bg-[#1A1A1A] border border-gold/40 rounded-2xl shadow-sm text-xs text-center" id="sessionWelcomeCard">
+                                <div class="w-10 h-10 rounded-full bg-pine/10 dark:bg-gold/10 text-pine dark:text-gold flex items-center justify-center mx-auto mb-2">
+                                    <i data-lucide="shield-check" class="w-5 h-5"></i>
                                 </div>
-                                <div class="grid grid-cols-2 gap-2 text-[11px]">
-                                    <div><span class="text-gray-400">DOB:</span> <span class="font-bold">15-08-1996</span></div>
-                                    <div><span class="text-gray-400">TOB:</span> <span class="font-bold">10:30 AM</span></div>
-                                    <div><span class="text-gray-400">POB:</span> <span class="font-bold">Chennai, Tamil Nadu</span></div>
-                                    <div><span class="text-gray-400">Rasi / Star:</span> <span class="font-bold text-pine dark:text-gold">Simha / Magha</span></div>
-                                    <div><span class="text-gray-400">Problem:</span> <span class="font-bold">Marriage Matching & Job Delay</span></div>
-                                    <div><span class="text-gray-400">Current Dasha:</span> <span class="font-bold text-status-online">Guru Dasha - Budha</span></div>
-                                </div>
-                            </div>
-
-                            <!-- Astrologer Greeting -->
-                            <div class="flex justify-start">
-                                <div class="max-w-md p-3.5 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-800 dark:text-white">
-                                    <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">Guruji S. Sundaramurthy</p>
-                                    <p>வணக்கம் கார்த்திக் அவர்களே! உங்கள் ஜாதகத்தை கவனித்து வருகிறேன். உங்கள் லக்கினம் துலாம், ராசி சிம்மம். தற்போது குரு தசையில் புதன் புக்தி நடப்பில் உள்ளது.</p>
-                                    <span class="text-[9px] text-gray-400 block text-right mt-1">02:41 PM</span>
-                                </div>
-                            </div>
-
-                            <!-- Devotee Question -->
-                            <div class="flex justify-end">
-                                <div class="max-w-md p-3.5 bg-pine text-white rounded-2xl rounded-tr-none shadow-sm text-xs">
-                                    <p class="font-bold text-gold text-[11px] mb-1">Karthik R.</p>
-                                    <p>வணக்கம் ஐயா, எனக்கு திருமணம் எப்போது அமையும்? மேலும் வெளிநாட்டு வேலை வாய்ப்பு உள்ளதா என்பதை பார்க்க வேண்டும்.</p>
-                                    <span class="text-[9px] text-gray-300 block text-right mt-1">02:42 PM</span>
-                                </div>
+                                <h4 class="font-bold text-pine dark:text-gold" id="welcomeDevoteeTitle">நேரலை ஆலோசனை துவங்கியது</h4>
+                                <p class="text-[11px] text-gray-500 mt-0.5">Encrypted Agora RTC Channel • Real-time Heartbeat Active</p>
                             </div>
                         </div>
 
@@ -758,7 +724,7 @@ if ($currentAstro) {
                         <!-- Chat Input & Call Action Controls -->
                         <div class="flex items-center gap-3">
                             <div class="flex-1 flex items-center bg-[#F8F9FA] dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-1">
-                                <input type="text" id="chatInput" placeholder="பக்தருக்கு ஆலோசனை செய்தி அனுப்பவும்..." class="w-full py-2 bg-transparent text-xs text-slate-800 dark:text-white placeholder-gray-400 focus:outline-none">
+                                <input type="text" id="chatInput" onkeydown="if(event.key==='Enter') sendChatMessage()" placeholder="பக்தருக்கு ஆலோசனை செய்தி அனுப்பவும்..." class="w-full py-2 bg-transparent text-xs text-slate-800 dark:text-white placeholder-gray-400 focus:outline-none">
                                 <button onclick="sendChatMessage()" class="p-1.5 text-pine dark:text-gold hover:opacity-80"><i data-lucide="send" class="w-4 h-4"></i></button>
                             </div>
 
@@ -786,10 +752,10 @@ if ($currentAstro) {
                         <div>
                             <span class="text-xs text-gray-300 font-semibold flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4 text-gold"></i> Verified Astrologer Wallet Balance</span>
                             <div class="mt-2 flex items-baseline gap-2">
-                                <span class="font-cinzel text-3xl sm:text-4xl font-bold text-gold">₹12,850.00</span>
-                                <span class="text-xs text-status-online font-bold bg-white/10 px-2 py-0.5 rounded-full">Ready for Payout</span>
+                                <span class="font-cinzel text-3xl sm:text-4xl font-bold text-gold">₹<?= number_format($totalEarnings, 2) ?></span>
+                                <span class="text-xs text-status-online font-bold bg-white/10 px-2 py-0.5 rounded-full"><?= $totalConsultations > 0 ? 'Ready for Payout' : 'Verified Balance' ?></span>
                             </div>
-                            <p class="text-xs text-gray-300 mt-1">Bank Account: HDFC Bank •••• 8821 (IFSC: HDFC0001234)</p>
+                            <p class="text-xs text-gray-300 mt-1">Bank Account: Verified Astrologer Settlement Account</p>
                         </div>
 
                         <div>
@@ -800,74 +766,40 @@ if ($currentAstro) {
                     </div>
                 </div>
 
-                <!-- Filters & Trend Chart -->
+                <!-- Filters & Real History -->
                 <div class="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl p-5 shadow-sm space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <h3 class="font-bold text-sm text-slate-900 dark:text-white">Earnings Trend (வருமான விவரம்)</h3>
-                        <div class="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl text-xs font-semibold">
-                            <button class="px-3 py-1 rounded-lg bg-white dark:bg-[#252525] text-pine dark:text-gold shadow-sm">Today</button>
-                            <button class="px-3 py-1 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">This Week</button>
-                            <button class="px-3 py-1 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">This Month</button>
-                            <button class="px-3 py-1 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">Custom</button>
-                        </div>
-                    </div>
-
-                    <!-- Daily Trend Bars Simulation -->
-                    <div class="grid grid-cols-7 gap-2 pt-4 items-end h-40 border-b border-gray-100 dark:border-white/10 pb-2 text-center text-[10px] text-gray-400">
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-16"></div><span>Mon</span><span class="font-bold text-slate-700 dark:text-white">₹1.8k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-24"></div><span>Tue</span><span class="font-bold text-slate-700 dark:text-white">₹2.4k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-20"></div><span>Wed</span><span class="font-bold text-slate-700 dark:text-white">₹2.1k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-28"></div><span>Thu</span><span class="font-bold text-slate-700 dark:text-white">₹3.2k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-32"></div><span>Fri</span><span class="font-bold text-slate-700 dark:text-white">₹3.8k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine dark:bg-gold rounded-t-lg h-36"></div><span>Sat</span><span class="font-bold text-pine dark:text-gold">₹4.2k</span></div>
-                        <div class="flex flex-col items-center gap-1"><div class="w-full bg-pine/30 dark:bg-gold/20 rounded-t-lg h-20"></div><span>Sun</span><span class="font-bold text-slate-700 dark:text-white">₹2.0k</span></div>
+                        <h3 class="font-bold text-sm text-slate-900 dark:text-white">Earnings History (வருமான விவரம்)</h3>
                     </div>
 
                     <!-- Transaction List -->
                     <div class="pt-2">
-                        <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-3">Detailed Transaction History</h4>
-                        <div class="space-y-2 text-xs">
-                            <div class="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-status-online flex items-center justify-center font-bold"><i data-lucide="plus" class="w-4 h-4"></i></div>
-                                    <div>
-                                        <p class="font-bold text-slate-800 dark:text-white">Consultation Fee · Chat 15 min · Client: Rahul S.</p>
-                                        <p class="text-[10px] text-gray-400">06 Nov 2026, 02:40 PM • Ref: TXN_882193</p>
+                        <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-3">Settlement & Consultation Records</h4>
+                        <div class="space-y-2 text-xs" id="walletTransactionsList">
+                            <?php if (empty($recentConsultations)): ?>
+                                <div class="p-6 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
+                                    <p class="font-bold text-xs text-slate-700 dark:text-gray-300">பரிவர்த்தனை பதிவுகள் எதுவும் இல்லை (No transactions recorded yet)</p>
+                                    <p class="text-[11px] text-gray-400 mt-1">உங்கள் ஆலோசனைகள் நிறைவடைந்தவுடன் வருமானத் தொகை இங்கே உடனுக்குடன் வரவு வைக்கப்படும்.</p>
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($recentConsultations as $rc): ?>
+                                    <div class="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-status-online flex items-center justify-center font-bold">
+                                                <i data-lucide="plus" class="w-4 h-4"></i>
+                                            </div>
+                                            <div>
+                                                <p class="font-bold text-slate-800 dark:text-white">Consultation Fee · <?= ucfirst($rc['type'] ?? 'Call') ?> <?= max(1, ceil(((int)($rc['duration_seconds'] ?? 0)) / 60)) ?> min · Client: <?= htmlspecialchars($rc['user_name'] ?? 'பக்தர்') ?></p>
+                                                <p class="text-[10px] text-gray-400"><?= date('d M Y, h:i A', strtotime($rc['created_at'] ?? 'now')) ?> • Session: <?= htmlspecialchars($rc['session_id'] ?? '') ?></p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-bold text-status-online">+ ₹<?= number_format((float)($rc['astrologer_share'] ?? 0), 2) ?></p>
+                                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-status-online font-bold">Credited (80%)</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="text-right">
-                                    <p class="font-bold text-status-online">+ ₹240.00</p>
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-status-online font-bold">Successful</span>
-                                </div>
-                            </div>
-
-                            <div class="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-gold/20 text-gold-amber flex items-center justify-center font-bold"><i data-lucide="gift" class="w-4 h-4"></i></div>
-                                    <div>
-                                        <p class="font-bold text-slate-800 dark:text-white">Gift Received · Rose Devotion Gift · Client: Anand</p>
-                                        <p class="text-[10px] text-gray-400">06 Nov 2026, 11:15 AM • 100% to Astrologer</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <p class="font-bold text-gold-amber">+ ₹100.00</p>
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Gift Credit</span>
-                                </div>
-                            </div>
-
-                            <div class="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-red-50 text-status-danger flex items-center justify-center font-bold"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></div>
-                                    <div>
-                                        <p class="font-bold text-slate-800 dark:text-white">Bank Payout · Transferred to HDFC Bank ****8821</p>
-                                        <p class="text-[10px] text-gray-400">04 Nov 2026 • TDS Deducted 10% (₹500)</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <p class="font-bold text-slate-800 dark:text-white">- ₹5,000.00</p>
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Disbursed</span>
-                                </div>
-                            </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -978,21 +910,21 @@ if ($currentAstro) {
                     <!-- Client Avatar with Pulsing Outer Ring -->
                     <div class="relative inline-block mb-4">
                         <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-pine to-gold p-1 shadow-xl">
-                            <div class="w-full h-full rounded-full bg-white dark:bg-[#1A1A1A] flex items-center justify-center font-cinzel text-2xl font-bold text-pine dark:text-gold">
-                                KR
+                            <div class="w-full h-full rounded-full bg-white dark:bg-[#1A1A1A] flex items-center justify-center font-cinzel text-2xl font-bold text-pine dark:text-gold" id="incomingAvatar">
+                                DV
                             </div>
                         </div>
                         <span class="absolute -top-1 -right-1 px-2.5 py-0.5 rounded-full bg-status-online text-white text-[10px] font-bold shadow-md animate-pulse">INCOMING</span>
                     </div>
 
-                    <h3 class="font-cinzel text-xl font-bold text-slate-900 dark:text-white" id="incomingDevoteeName">Karthik R.</h3>
-                    <p class="text-xs text-pine dark:text-gold font-semibold mt-0.5">Chennai, Tamil Nadu • Preferred: Tamil</p>
-                    <p class="text-[11px] text-gray-500 mt-1">Category: <span class="font-bold text-slate-700 dark:text-gray-300">Love & Marriage Compatibility</span></p>
+                    <h3 class="font-cinzel text-xl font-bold text-slate-900 dark:text-white" id="incomingDevoteeName">பக்தர் அழைப்பு...</h3>
+                    <p class="text-xs text-pine dark:text-gold font-semibold mt-0.5" id="incomingDevoteePhone">நேரலை அழைப்பு விடுக்கப்பட்டுள்ளது</p>
+                    <p class="text-[11px] text-gray-500 mt-1" id="incomingCallType">Audio Consultation</p>
 
                     <!-- 30-Second Countdown Timer Ring -->
                     <div class="my-5 flex items-center justify-center gap-2">
                         <div class="w-12 h-12 rounded-full border-4 border-gold border-t-status-danger animate-spin flex items-center justify-center font-mono font-bold text-sm text-slate-800 dark:text-white">
-                            <span id="countdownSeconds">28</span>
+                            <span id="countdownSeconds">30</span>
                         </div>
                         <span class="text-xs text-gray-400">Seconds to Auto-Pass</span>
                     </div>
@@ -1003,8 +935,8 @@ if ($currentAstro) {
                             <i data-lucide="phone-off" class="w-4 h-4"></i> Decline / Busy
                         </button>
 
-                        <button onclick="acceptConsultationFromAlert()" class="py-3.5 rounded-2xl bg-status-online hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5 animate-pulse">
-                            <i data-lucide="phone" class="w-4 h-4"></i> Accept (₹20/m)
+                        <button onclick="acceptConsultationFromAlert()" id="incomingAcceptBtn" class="py-3.5 rounded-2xl bg-status-online hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5 animate-pulse">
+                            <i data-lucide="phone" class="w-4 h-4"></i> Accept Call
                         </button>
                     </div>
                 </div>
@@ -1049,7 +981,7 @@ if ($currentAstro) {
                 </h3>
                 <div class="space-y-4 text-xs">
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="block text-gray-500 mb-1">Devotee Name</label><input type="text" value="Karthik R." class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"></div>
+                        <div><label class="block text-gray-500 mb-1">Devotee Name</label><input type="text" id="kundaliDevoteeName" placeholder="பக்தர் பெயர் (Devotee Name)" class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"></div>
                         <div><label class="block text-gray-500 mb-1">Date of Birth</label><input type="date" value="1996-08-15" class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"></div>
                         <div><label class="block text-gray-500 mb-1">Time of Birth</label><input type="time" value="10:30" class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"></div>
                         <div><label class="block text-gray-500 mb-1">Place of Birth</label><input type="text" value="Chennai, Tamil Nadu" class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"></div>
@@ -1187,100 +1119,210 @@ if ($currentAstro) {
         lucide.createIcons();
     }
 
-    // Incoming Consultation Alert Modal (Screen 2) - Real-time Polling & Agora Hook
+    // Current Astrologer Session Data
+    const CURRENT_ASTRO_ID = <?= (int)($currentAstro['id'] ?? 0) ?>;
+    const CURRENT_ASTRO_PHONE = '<?= addslashes($currentAstro['phone'] ?? '') ?>';
+    const CURRENT_ASTRO_NAME = '<?= addslashes($currentAstro['name'] ?? 'Astrologer') ?>';
+
+    // Helper for API endpoint path resolution
+    function getApiEndpoint(path) {
+        return '../api' + (path.startsWith('/') ? path : '/' + path);
+    }
+
+    // Web Audio API Ringtone Synthesizer (Zero External Dependencies)
+    let ringtoneAudioCtx = null;
+    let ringtoneTimer = null;
+
+    function startRingtoneSound() {
+        stopRingtoneSound();
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            ringtoneAudioCtx = new AudioCtx();
+
+            const playTone = () => {
+                if (!ringtoneAudioCtx) return;
+                if (ringtoneAudioCtx.state === 'suspended') {
+                    ringtoneAudioCtx.resume();
+                }
+                const osc = ringtoneAudioCtx.createOscillator();
+                const gain = ringtoneAudioCtx.createGain();
+
+                osc.type = 'sine';
+                // Temple bell spiritual ring sound
+                osc.frequency.setValueAtTime(880, ringtoneAudioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, ringtoneAudioCtx.currentTime + 0.4);
+
+                gain.gain.setValueAtTime(0.35, ringtoneAudioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ringtoneAudioCtx.currentTime + 0.45);
+
+                osc.connect(gain);
+                gain.connect(ringtoneAudioCtx.destination);
+
+                osc.start();
+                osc.stop(ringtoneAudioCtx.currentTime + 0.5);
+            };
+
+            playTone();
+            ringtoneTimer = setInterval(playTone, 1400);
+        } catch (e) {
+            console.warn('Ringtone sound init error:', e);
+        }
+    }
+
+    function stopRingtoneSound() {
+        if (ringtoneTimer) {
+            clearInterval(ringtoneTimer);
+            ringtoneTimer = null;
+        }
+        if (ringtoneAudioCtx) {
+            try { ringtoneAudioCtx.close(); } catch (e) {}
+            ringtoneAudioCtx = null;
+        }
+    }
+
+    // Request desktop browser notifications
+    function requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+
+    // Incoming Consultation Alert Modal & Real-time Polling
     let countdownInterval = null;
     let currentIncomingSession = null;
     let pendingPollInterval = null;
-
     let ringingPollInterval = null;
     let ringingCountdownInterval = null;
+    let heartbeatInterval = null;
 
     function renderQueueUI(session) {
         const queueContainer = document.getElementById('liveQueueContainer');
         const badge = document.getElementById('queueCountBadge');
-        if (!queueContainer || !badge) return;
+        const cardCount = document.getElementById('cardQueueCount');
 
         if (session) {
-            badge.textContent = '1 Waiting';
-            badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 text-[10px] font-bold animate-pulse';
-            queueContainer.innerHTML = `
-                <div class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-50/10 dark:bg-emerald-950/20 flex items-center justify-between gap-4 shadow-sm animate-pulse">
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-full bg-emerald-500/10 text-emerald-600 font-bold flex items-center justify-center text-sm border border-emerald-500/30">
-                            ${(session.user_name || 'DV').substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h4 class="font-bold text-xs text-slate-800 dark:text-white">${session.user_name || 'பக்தர்'}</h4>
-                                <span class="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 text-[9px] font-bold rounded uppercase">${session.type || 'audio'} Call</span>
+            if (badge) {
+                badge.textContent = '1 Waiting';
+                badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 text-[10px] font-bold animate-pulse';
+            }
+            if (cardCount) {
+                cardCount.textContent = '● 1 Devotee in Queue';
+                cardCount.className = 'text-[11px] text-status-online font-semibold mt-1 animate-pulse';
+            }
+            if (queueContainer) {
+                queueContainer.innerHTML = `
+                    <div class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-50/10 dark:bg-emerald-950/20 flex items-center justify-between gap-4 shadow-sm animate-pulse">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-full bg-emerald-500/10 text-emerald-600 font-bold flex items-center justify-center text-sm border border-emerald-500/30">
+                                ${(session.user_name || 'DV').substring(0, 2).toUpperCase()}
                             </div>
-                            <p class="text-[11px] text-gray-500">${session.user_phone || '8000000001'} • ₹${session.rate_per_min}/min</p>
-                            <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: ${session.seconds_elapsed || 0}s</p>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-bold text-xs text-slate-800 dark:text-white">${session.user_name || 'பக்தர்'}</h4>
+                                    <span class="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 text-[9px] font-bold rounded uppercase">${session.type || 'audio'} Call</span>
+                                </div>
+                                <p class="text-[11px] text-gray-500">${session.user_phone || ''} • ₹${session.rate_per_min}/min</p>
+                                <p class="text-[10px] text-status-busy font-semibold mt-0.5">⏱️ Waiting: ${session.seconds_elapsed || 0}s</p>
+                            </div>
                         </div>
+                        <button onclick="triggerIncomingAlert(${session.seconds_left || 30})" class="px-3.5 py-2 rounded-xl bg-status-online hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+                            <i data-lucide="phone" class="w-3.5 h-3.5"></i> Connect
+                        </button>
                     </div>
-                    <button onclick="triggerIncomingAlert(${session.seconds_left || 30})" class="px-3.5 py-2 rounded-xl bg-status-online hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
-                        <i data-lucide="phone" class="w-3.5 h-3.5"></i> Connect
-                    </button>
-                </div>
-            `;
+                `;
+            }
         } else {
-            badge.textContent = '0 Waiting';
-            badge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold';
-            queueContainer.innerHTML = `
-                <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
-                    <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
-                    <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
-                    <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
-                </div>
-            `;
+            if (badge) {
+                badge.textContent = '0 Waiting';
+                badge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-status-online text-[10px] font-bold';
+            }
+            if (cardCount) {
+                cardCount.textContent = '● 0 Devotees in Queue';
+                cardCount.className = 'text-[11px] text-gray-400 font-semibold mt-1';
+            }
+            if (queueContainer) {
+                queueContainer.innerHTML = `
+                    <div class="col-span-full py-8 text-center text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-200 dark:border-white/10 rounded-xl">
+                        <i data-lucide="phone-call" class="w-8 h-8 mx-auto mb-2 text-emerald-500/70 animate-pulse"></i>
+                        <p class="font-bold text-xs text-slate-700 dark:text-gray-300">வரிசையில் பக்தர்கள் யாரும் இல்லை (Queue is Clear)</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">நீங்கள் ஆன்லைனில் உள்ளீர்கள். பக்தர் அழைப்பு விடுத்தவுடன் திரை தானாக ஒளிரும்.</p>
+                    </div>
+                `;
+            }
         }
         if (window.lucide) lucide.createIcons();
     }
 
     function startPendingPoll() {
         if (pendingPollInterval) clearInterval(pendingPollInterval);
+        if (CURRENT_ASTRO_ID <= 0) return;
+
         pendingPollInterval = setInterval(async () => {
             const modal = document.getElementById('incomingAlertModal');
             const ringingModal = document.getElementById('ringingUserModal');
             const activeScreen = document.getElementById('screenActiveConsultation');
             // If already in active call or alert/ringing modal is showing, skip
-            if (!modal.classList.contains('hidden') || 
+            if ((modal && !modal.classList.contains('hidden')) || 
                 (ringingModal && !ringingModal.classList.contains('hidden')) || 
                 (activeScreen && !activeScreen.classList.contains('hidden'))) {
                 return;
             }
 
             try {
-                const res = await fetch('/api/sessions/pending.php?astrologer_id=1&phone=9876543210');
+                const url = getApiEndpoint(`/sessions/pending.php?astrologer_id=${CURRENT_ASTRO_ID}&phone=${encodeURIComponent(CURRENT_ASTRO_PHONE)}`);
+                const res = await fetch(url);
                 const json = await res.json();
                 if (json.ok && json.data && json.data.has_incoming && json.data.session) {
                     currentIncomingSession = json.data.session;
                     renderQueueUI(currentIncomingSession);
-                    document.getElementById('incomingDevoteeName').textContent = currentIncomingSession.user_name || 'பக்தர் (Devotee)';
                     
-                    const phoneTag = document.querySelector('#incomingAlertModal .text-xs.text-pine');
+                    const uName = currentIncomingSession.user_name || 'பக்தர் (Devotee)';
+                    document.getElementById('incomingDevoteeName').textContent = uName;
+                    const avatarElem = document.getElementById('incomingAvatar');
+                    if (avatarElem) avatarElem.textContent = (uName || 'DV').substring(0, 2).toUpperCase();
+
+                    const phoneTag = document.getElementById('incomingDevoteePhone');
                     if (phoneTag) {
-                        phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • Preferred: Tamil';
+                        phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • நேரலை அழைப்பு விடுக்கப்பட்டுள்ளது';
                     }
 
-                    const catTag = document.querySelector('#incomingAlertModal span.font-bold');
+                    const catTag = document.getElementById('incomingCallType');
                     if (catTag) {
                         catTag.textContent = (currentIncomingSession.type || 'audio').toUpperCase() + ' Call (₹' + currentIncomingSession.rate_per_min + '/m)';
                     }
 
+                    const acceptBtn = document.getElementById('incomingAcceptBtn');
+                    if (acceptBtn) {
+                        acceptBtn.innerHTML = `<i data-lucide="phone" class="w-4 h-4"></i> Accept (₹${currentIncomingSession.rate_per_min}/m)`;
+                        if (window.lucide) lucide.createIcons();
+                    }
+
                     triggerIncomingAlert(currentIncomingSession.seconds_left || 30);
+
+                    // Browser desktop notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        try {
+                            new Notification('🌟 பக்தர் நேரலை அழைப்பு! (Incoming Call)', {
+                                body: `${uName} (${(currentIncomingSession.type || 'audio').toUpperCase()} Call - ₹${currentIncomingSession.rate_per_min}/m)`,
+                                icon: '../assets/logo.jpg',
+                                requireInteraction: true
+                            });
+                        } catch (e) {}
+                    }
                 } else {
                     renderQueueUI(null);
                 }
             } catch (err) {
                 // background poll silent catch
             }
-        }, 2000);
+        }, 1500);
     }
 
     function triggerIncomingAlert(customSeconds = 30) {
+        startRingtoneSound();
         const modal = document.getElementById('incomingAlertModal');
-        modal.classList.remove('hidden');
+        if (modal) modal.classList.remove('hidden');
 
         let seconds = customSeconds > 0 ? customSeconds : 30;
         const countSpan = document.getElementById('countdownSeconds');
@@ -1297,11 +1339,13 @@ if ($currentAstro) {
     }
 
     async function declineConsultation() {
+        stopRingtoneSound();
         if (countdownInterval) clearInterval(countdownInterval);
-        document.getElementById('incomingAlertModal').classList.add('hidden');
+        const modal = document.getElementById('incomingAlertModal');
+        if (modal) modal.classList.add('hidden');
         if (currentIncomingSession && currentIncomingSession.session_id) {
             try {
-                await fetch('/api/sessions/reject.php', {
+                await fetch(getApiEndpoint('/sessions/reject.php'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: currentIncomingSession.session_id })
@@ -1313,8 +1357,10 @@ if ($currentAstro) {
     }
 
     async function acceptConsultationFromAlert() {
+        stopRingtoneSound();
         if (countdownInterval) clearInterval(countdownInterval);
-        document.getElementById('incomingAlertModal').classList.add('hidden');
+        const modal = document.getElementById('incomingAlertModal');
+        if (modal) modal.classList.add('hidden');
 
         if (!currentIncomingSession || !currentIncomingSession.session_id) {
             return;
@@ -1323,11 +1369,11 @@ if ($currentAstro) {
         const sid = currentIncomingSession.session_id;
 
         try {
-            // 1. Astrologer signals Accept -> Session becomes 'ringing_user' & triggers FCM
-            const res = await fetch('/api/sessions/accept.php', {
+            // 1. Astrologer signals Accept -> Session becomes 'ringing_user'
+            const res = await fetch(getApiEndpoint('/sessions/accept.php'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sid, astrologer_id: 1 })
+                body: JSON.stringify({ session_id: sid, astrologer_id: CURRENT_ASTRO_ID })
             });
             const data = await res.json();
 
@@ -1354,7 +1400,7 @@ if ($currentAstro) {
             if (ringingPollInterval) clearInterval(ringingPollInterval);
             ringingPollInterval = setInterval(async () => {
                 try {
-                    const statusRes = await fetch(`/api/sessions/check_status.php?session_id=${sid}`);
+                    const statusRes = await fetch(getApiEndpoint(`/sessions/check_status.php?session_id=${sid}`));
                     const statusData = await statusRes.json();
 
                     if (statusData.ok && statusData.data) {
@@ -1365,10 +1411,39 @@ if ($currentAstro) {
                             clearInterval(ringingCountdownInterval);
                             if (ringingModal) ringingModal.classList.add('hidden');
 
-                            document.getElementById('activeClientName').textContent = (currentIncomingSession.user_name || 'பக்தர்') + ' (' + (currentIncomingSession.type || 'audio').toUpperCase() + ')';
+                            const uName = currentIncomingSession.user_name || 'பக்தர்';
+                            const callType = (currentIncomingSession.type || 'audio').toUpperCase();
+
+                            document.getElementById('activeClientName').textContent = `${uName} (${callType})`;
+                            const actAvatar = document.getElementById('activeDevoteeAvatar');
+                            if (actAvatar) actAvatar.textContent = (uName || 'DV').substring(0, 2).toUpperCase();
+                            const actBadge = document.getElementById('activeCallBadge');
+                            if (actBadge) actBadge.textContent = callType;
+
+                            const welcomeTitle = document.getElementById('welcomeDevoteeTitle');
+                            if (welcomeTitle) welcomeTitle.textContent = `${uName} அவர்களுடன் நேரலை ${callType} ஆலோசனை இணைக்கப்பட்டது!`;
+
+                            // Initialize clean chat with astrologer welcoming greeting
+                            const chatMessages = document.getElementById('chatMessages');
+                            if (chatMessages) {
+                                chatMessages.innerHTML = '';
+                                const greetingDiv = document.createElement('div');
+                                greetingDiv.className = 'flex justify-start';
+                                greetingDiv.innerHTML = `
+                                    <div class="max-w-md p-3.5 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-800 dark:text-white">
+                                        <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">${escapeHtml(CURRENT_ASTRO_NAME)}</p>
+                                        <p>வணக்கம் ${escapeHtml(uName)} அவர்களே! அஸ்ட்ரோசுபம் நேரலை ஆலோசனைக்கு வரவேற்கிறோம். உங்களின் பிறப்பு விபரங்களை பகிருங்கள் அல்லது உங்கள் கேள்வியை கேளுங்கள்.</p>
+                                        <span class="text-[9px] text-gray-400 block text-right mt-1">Just now</span>
+                                    </div>
+                                `;
+                                chatMessages.appendChild(greetingDiv);
+                            }
+
                             showScreen('screenActiveConsultation');
                             timerSeconds = 0;
-                            startConsultationTimer();
+                            startConsultationTimer(currentIncomingSession.rate_per_min || 20);
+                            startHeartbeatLoop(sid);
+                            startChatPolling(sid);
                         } else if (curStatus === 'cancelled' || curStatus === 'completed') {
                             clearInterval(ringingPollInterval);
                             clearInterval(ringingCountdownInterval);
@@ -1390,6 +1465,7 @@ if ($currentAstro) {
     }
 
     async function cancelRingingUser() {
+        stopRingtoneSound();
         if (ringingCountdownInterval) clearInterval(ringingCountdownInterval);
         if (ringingPollInterval) clearInterval(ringingPollInterval);
         const ringingModal = document.getElementById('ringingUserModal');
@@ -1397,7 +1473,7 @@ if ($currentAstro) {
 
         if (currentIncomingSession && currentIncomingSession.session_id) {
             try {
-                await fetch('/api/sessions/reject.php', {
+                await fetch(getApiEndpoint('/sessions/reject.php'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: currentIncomingSession.session_id })
@@ -1412,13 +1488,14 @@ if ($currentAstro) {
         document.getElementById('activeClientName').textContent = name + ' (' + type + ')';
         showScreen('screenActiveConsultation');
         timerSeconds = 0;
-        startConsultationTimer();
+        startConsultationTimer(rate || 20);
     }
 
     // Active Consultation Timer & Dynamic Earnings Ticker
     let timerSeconds = 0;
     let timerInterval = null;
-    function startConsultationTimer() {
+
+    function startConsultationTimer(ratePerMin = 20) {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             timerSeconds++;
@@ -1426,10 +1503,30 @@ if ($currentAstro) {
             const secs = String(timerSeconds % 60).padStart(2, '0');
             document.getElementById('consultationTimer').textContent = `${mins}:${secs}`;
 
-            // Rate ₹20/min = ₹0.33 per sec
-            const earnings = (timerSeconds * (20 / 60)).toFixed(2);
+            // Astrologer gets 80% share
+            const earnings = (timerSeconds * (ratePerMin / 60) * 0.80).toFixed(2);
             document.getElementById('liveEarningsTicker').textContent = `₹ ${earnings}`;
         }, 1000);
+    }
+
+    function startHeartbeatLoop(sid) {
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(async () => {
+            try {
+                const res = await fetch(getApiEndpoint('/sessions/heartbeat.php'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sid })
+                });
+                const data = await res.json();
+                if (data.data && data.data.terminate) {
+                    clearInterval(heartbeatInterval);
+                    clearInterval(timerInterval);
+                    alert('பக்தரின் வாலட் இருப்பு முடிந்துவிட்டது! ஆலோசனை தானாக நிறைவு பெறுகிறது.');
+                    endConsultationConfirm(true);
+                }
+            } catch (e) {}
+        }, 60000);
     }
 
     // Slide-over Kundali Drawer Toggle
@@ -1438,8 +1535,68 @@ if ($currentAstro) {
         drawer.classList.toggle('hidden');
     }
 
-    // Chat in Active Consultation
-    function sendChatMessage() {
+    // HTML Sanitizer
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Chat in Active Consultation - Real-Time Bidirectional Sync
+    let activeChatSessionId = null;
+    let lastChatMsgId = 0;
+    let chatPollInterval = null;
+
+    function startChatPolling(sid) {
+        activeChatSessionId = sid;
+        lastChatMsgId = 0;
+        if (chatPollInterval) clearInterval(chatPollInterval);
+        fetchChatMessages();
+        chatPollInterval = setInterval(fetchChatMessages, 1200);
+    }
+
+    async function fetchChatMessages() {
+        if (!activeChatSessionId) return;
+        try {
+            const res = await fetch(getApiEndpoint('/chat/messages.php?session_id=' + encodeURIComponent(activeChatSessionId) + '&last_id=' + lastChatMsgId));
+            const data = await res.json();
+            if (data.ok && data.data && data.data.messages && data.data.messages.length > 0) {
+                data.data.messages.forEach(msg => {
+                    const id = parseInt(msg.id);
+                    if (id > lastChatMsgId) {
+                        lastChatMsgId = id;
+                    }
+                    if (msg.sender_type === 'user') {
+                        appendUserChatBubble(msg.content, msg.created_at);
+                    }
+                });
+            }
+        } catch (e) {
+            // silent catch
+        }
+    }
+
+    function appendUserChatBubble(text, timeStr) {
+        const chat = document.getElementById('chatMessages');
+        if (!chat) return;
+        const div = document.createElement('div');
+        div.className = 'flex justify-end';
+        div.innerHTML = `
+            <div class="max-w-md p-3.5 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 rounded-2xl rounded-tr-none text-xs text-slate-800 dark:text-white">
+                <p class="font-bold text-emerald-600 dark:text-emerald-400 text-[11px] mb-1">பக்தர் (Client)</p>
+                <p>${escapeHtml(text)}</p>
+                <span class="text-[9px] text-gray-400 block text-right mt-1">${timeStr ? (timeStr.split(' ')[1] || timeStr) : 'Just now'}</span>
+            </div>
+        `;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendChatMessage() {
         const input = document.getElementById('chatInput');
         const msg = input.value.trim();
         if (!msg) return;
@@ -1449,14 +1606,31 @@ if ($currentAstro) {
         div.className = 'flex justify-start';
         div.innerHTML = `
             <div class="max-w-md p-3.5 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-800 dark:text-white">
-                <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">Guruji S. Sundaramurthy</p>
-                <p>${msg}</p>
+                <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">${escapeHtml(CURRENT_ASTRO_NAME)}</p>
+                <p>${escapeHtml(msg)}</p>
                 <span class="text-[9px] text-gray-400 block text-right mt-1">Just now</span>
             </div>
         `;
         chat.appendChild(div);
         input.value = '';
         chat.scrollTop = chat.scrollHeight;
+
+        if (activeChatSessionId) {
+            try {
+                await fetch(getApiEndpoint('/chat/send.php'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: activeChatSessionId,
+                        sender_type: 'astrologer',
+                        sender_id: CURRENT_ASTRO_ID,
+                        content: msg
+                    })
+                });
+            } catch (e) {
+                console.error('Send chat error:', e);
+            }
+        }
     }
 
     function sendQuickRemedy(text) {
@@ -1472,12 +1646,15 @@ if ($currentAstro) {
         btn.classList.toggle('text-status-online');
     }
 
-    async function endConsultationConfirm() {
-        if (confirm('நிச்சயமாக இந்த ஆலோசனையை முடிக்க விரும்புகிறீர்களா? (End Consultation and finalize session?)')) {
+    async function endConsultationConfirm(auto = false) {
+        if (auto || confirm('நிச்சயமாக இந்த ஆலோசனையை முடிக்க விரும்புகிறீர்களா? (End Consultation and finalize session?)')) {
             if (timerInterval) clearInterval(timerInterval);
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (chatPollInterval) clearInterval(chatPollInterval);
+
             if (currentIncomingSession && currentIncomingSession.session_id) {
                 try {
-                    await fetch('/api/sessions/end.php', {
+                    await fetch(getApiEndpoint('/sessions/end.php'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ session_id: currentIncomingSession.session_id, rating: 5 })
@@ -1486,25 +1663,32 @@ if ($currentAstro) {
                 currentIncomingSession = null;
             }
             alert('Consultation Completed! Session ended and earnings credited to your Astrologer Wallet.');
-            showScreen('screenHome');
+            window.location.reload();
         }
     }
 
     // Modals
-    function openKundaliModal() { document.getElementById('kundaliModal').classList.remove('hidden'); }
+    function openKundaliModal(clientName = '') { 
+        if (clientName) {
+            const input = document.getElementById('kundaliDevoteeName');
+            if (input) input.value = clientName;
+        }
+        document.getElementById('kundaliModal').classList.remove('hidden'); 
+    }
     function closeKundaliModal() { document.getElementById('kundaliModal').classList.add('hidden'); }
 
     function openRatesModal() { document.getElementById('ratesModal').classList.remove('hidden'); }
     function closeRatesModal() { document.getElementById('ratesModal').classList.add('hidden'); }
 
-    function openBroadcastModal() { alert('Agora Live Broadcast Video Engine initialized! Room Channel: ASTRO_LIVE_ROOM_1'); }
+    function openBroadcastModal() { alert('Agora Live Broadcast Video Engine initialized! Room Channel: ASTRO_LIVE_ROOM_' + CURRENT_ASTRO_ID); }
     function openRemediesModal() { alert('Astromall Remedies: Navaratna Gemstones, Rudraksha & Temple Poojas catalog loaded!'); }
     function openNotesModal() { alert('Client Notes & Horoscope Records synchronized with MySQL.'); }
 
     function openWithdrawModal() {
-        const amt = prompt('Enter withdrawal amount in ₹ (Available: ₹12,850.00):', '5000');
+        const available = <?= json_encode(number_format($totalEarnings, 2)) ?>;
+        const amt = prompt(`Enter withdrawal amount in ₹ (Available Balance: ₹${available}):`, '1000');
         if (amt) {
-            alert(`Withdrawal request for ₹${amt} submitted! Disbursal to HDFC Bank ****8821 initiated.`);
+            alert(`Withdrawal request for ₹${amt} submitted! Disbursal initiated to your verified Astrologer Bank Account.`);
         }
     }
 
@@ -1524,6 +1708,7 @@ if ($currentAstro) {
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+        requestNotificationPermission();
         startPendingPoll();
     });
 </script>
