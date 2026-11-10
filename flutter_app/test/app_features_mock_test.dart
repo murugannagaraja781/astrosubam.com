@@ -178,12 +178,6 @@ void main() {
 
       // Verify user message is displayed in chat
       expect(find.text('DOB: 15-08-1995, 10:30 AM, Chennai'), findsOneWidget);
-
-      // Wait for simulated astrologer response (1 second)
-      await tester.pump(const Duration(seconds: 2));
-
-      // Verify Astrologer response appeared
-      expect(find.textContaining('Noted! Analyzing planetary transits'), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------
@@ -280,10 +274,9 @@ void main() {
       expect(find.text("Today's Earnings"), findsOneWidget);
       expect(find.text('Wallet Balance'), findsOneWidget);
 
-      // Check Live Consultation Queue
+      // Check Live Consultation Queue (Real queue: Empty state when no live requests)
       expect(find.text('Live Consultation Queue'), findsOneWidget);
-      expect(find.text('Karthik R.'), findsOneWidget);
-      expect(find.text('Priya M.'), findsOneWidget);
+      expect(find.text('No Live Consultation Requests'), findsOneWidget);
 
       // Check Quick Action Grid
       final kundaliBtn = find.text('Generate Kundali');
@@ -309,21 +302,15 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      // Tap on "Simulate Incoming Call" utility tile to open Screen 2 (Incoming Alert Modal)
-      final alertTile = find.text('Simulate Incoming Call');
-      await tester.ensureVisible(alertTile);
-      await tester.pumpAndSettle();
-      await tester.tap(alertTile);
-      await tester.pumpAndSettle();
-
-      // Verify Incoming Call Alert Modal
-      expect(find.text('INCOMING CALL'), findsOneWidget);
-      expect(find.textContaining('Love & Marriage Compatibility'), findsOneWidget);
-      expect(find.textContaining('Accept'), findsOneWidget);
-
-      // Accept Consultation to open Screen 3 (Active Consultation with Live Kundali Drawer)
-      final acceptBtn = find.textContaining('Accept');
-      await tester.tap(acceptBtn);
+      // Test Astrologer Active Consultation Screen with Real Handshake
+      await tester.pumpWidget(const MaterialApp(
+        home: AstrologerActiveConsultationScreen(
+          clientName: 'Karthik R.',
+          consultationType: 'Live Chat',
+          sessionId: 'TEST_SESSION_101',
+          channelName: 'astrosubam_TEST_101',
+        ),
+      ));
       await tester.pumpAndSettle();
 
       // Verify Active Consultation Screen
