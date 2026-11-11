@@ -858,15 +858,23 @@ try {
                     <img id="chat-astro-img" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80" alt="Astro" class="w-10 h-10 rounded-xl object-cover border border-astro-gold">
                     <div>
                         <h4 id="chat-astro-name" class="font-bold text-sm text-white font-cinzel">Guruji S. Sundaramurthy</h4>
-                        <div class="flex items-center gap-1.5 text-[11px] text-astro-emeraldLight">
+                        <div class="flex items-center gap-2 text-[11px] text-astro-emeraldLight">
                             <span class="w-2 h-2 rounded-full bg-astro-emerald animate-pulse"></span>
-                            நேரலை ஆலோசனை • ₹<span id="chat-rate-val">12</span>/நிமி
+                            <span id="chat-status-text">இணைக்கிறது...</span> • 
+                            <span id="chat-timer-display" class="font-mono text-astro-gold font-bold">00:00</span> • 
+                            <span>₹<span id="chat-rate-val">12</span>/நிமி</span>
                         </div>
                     </div>
                 </div>
-                <button onclick="closeChatModal()" class="btn-emerald px-3 py-1.5 rounded-lg text-xs font-bold text-red-300 border-red-500/30 hover:bg-red-500/20">
-                    முடிக்க (End)
-                </button>
+                <div class="flex items-center gap-2">
+                    <span id="chat-deducted-badge" class="hidden sm:inline-block px-2.5 py-1 rounded-lg bg-astro-base text-astro-gold text-xs font-bold border border-astro-gold/30">
+                        ₹0.00
+                    </span>
+                    <button type="button" onclick="endLiveChatSession()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 shadow-md transition-all flex items-center gap-1">
+                        <i data-lucide="phone-off" class="w-3.5 h-3.5"></i>
+                        <span>முடிக்க (End)</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Chat Messages Container -->
@@ -1268,11 +1276,25 @@ try {
                 .replace(/'/g, '&#039;');
         }
 
+        let chatTimerInterval = null;
+        let chatBillingInterval = null;
+        let chatActiveSeconds = 0;
+        let chatTotalDeducted = 0;
+
         function openChatModal(name, rate, sessionId = null, astroId = 1) {
             currentChatSessionId = sessionId;
             lastWebChatMsgId = 0;
+            chatActiveSeconds = 0;
+            chatTotalDeducted = 0;
+
             document.getElementById('chat-astro-name').innerText = name;
             document.getElementById('chat-rate-val').innerText = rate;
+            const timerEl = document.getElementById('chat-timer-display');
+            if (timerEl) timerEl.innerText = '00:00';
+            const statusEl = document.getElementById('chat-status-text');
+            if (statusEl) statusEl.innerText = sessionId ? 'இணைக்கிறது...' : 'நேரலை';
+            const deductedBadge = document.getElementById('chat-deducted-badge');
+            if (deductedBadge) deductedBadge.innerText = '₹0.00';
 
             // Clean chat container with astrologer welcome
             const container = document.getElementById('chat-messages');
@@ -1290,6 +1312,47 @@ try {
 
             if (chatPollTimer) clearInterval(chatPollTimer);
             if (chatStatusPollTimer) clearInterval(chatStatusPollTimer);
+            if (chatTimerInterval) clearInterval(chatTimerInterval);
+            if (chatBillingInterval) clearInterval(chatBillingInterval);
+
+            // Start chat duration timer (1 second ticker)
+            chatTimerInterval = setInterval(() => {
+                chatActiveSeconds++;
+                const mins = String(Math.floor(chatActiveSeconds / 60)).padStart(2, '0');
+                const secs = String(chatActiveSeconds % 60).padStart(2, '0');
+                const tEl = document.getElementById('chat-timer-display');
+                if (tEl) tEl.innerText = `${mins}:${secs}`;
+            }, 1000);
+
+            // Start 60-second Real-time Billing Heartbeat for Chat
+            chatBillingInterval = setInterval(async () => {
+                const chatRate = parseFloat(rate) || 12.0;
+                if (AppState.walletBalance >= chatRate) {
+                    AppState.walletBalance -= chatRate;
+                    chatTotalDeducted += chatRate;
+                    const dBadge = document.getElementById('chat-deducted-badge');
+                    if (dBadge) dBadge.innerText = '₹' + chatTotalDeducted.toFixed(2);
+                    updateWalletUI();
+
+                    if (currentChatSessionId) {
+                        try {
+                            const hbRes = await fetch(getApiEndpoint('/sessions/heartbeat.php'), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ session_id: currentChatSessionId })
+                            });
+                            const hbData = await hbRes.json();
+                            if (hbData.data && hbData.data.terminate) {
+                                alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! சாட் ஆலோசனை தானாக நிறைவு பெறுகிறது.');
+                                endLiveChatSession();
+                            }
+                        } catch (e) {}
+                    }
+                } else {
+                    alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! சாட் ஆலோசனை தானாக நிறைவு பெறுகிறது.');
+                    endLiveChatSession();
+                }
+            }, 60000);
 
             if (sessionId) {
                 // Poll session handshake
@@ -1305,6 +1368,18 @@ try {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ session_id: sessionId, user_id: 2 })
                                 });
+                                const sText = document.getElementById('chat-status-text');
+                                if (sText) sText.innerText = 'நேரலை இணைக்கப்பட்டது';
+                            } else if (status === 'active') {
+                                const sText = document.getElementById('chat-status-text');
+                                if (sText) sText.innerText = 'நேரலை இணைக்கப்பட்டது';
+                            } else if (status === 'completed' || status === 'cancelled') {
+                                clearInterval(chatStatusPollTimer);
+                                clearInterval(chatPollTimer);
+                                clearInterval(chatTimerInterval);
+                                clearInterval(chatBillingInterval);
+                                document.getElementById('chat-modal').classList.add('hidden');
+                                alert('ஜோதிடர் ஆலோசனையை நிறைவு செய்தார் (Consultation Ended).');
                             }
                         }
                     } catch (e) {}
@@ -1331,35 +1406,35 @@ try {
             }
         }
 
-        function appendAstrologerChatBubble(text) {
-            const container = document.getElementById('chat-messages');
-            if (!container) return;
-            const reply = document.createElement('div');
-            reply.className = 'flex items-start gap-2 max-w-[85%]';
-            reply.innerHTML = `
-                <div class="w-7 h-7 rounded-lg bg-astro-surface border border-astro-gold/40 flex items-center justify-center text-astro-gold text-xs font-bold flex-shrink-0">
-                    ॐ
-                </div>
-                <div class="bg-astro-surface border border-astro-emerald/30 p-3 rounded-2xl rounded-tl-none text-xs text-white/90 leading-relaxed font-tamil">
-                    ${escapeHtml(text)}
-                </div>
-            `;
-            container.appendChild(reply);
-            container.scrollTop = container.scrollHeight;
+        async function endLiveChatSession() {
+            if (chatPollTimer) clearInterval(chatPollTimer);
+            if (chatStatusPollTimer) clearInterval(chatStatusPollTimer);
+            if (chatTimerInterval) clearInterval(chatTimerInterval);
+            if (chatBillingInterval) clearInterval(chatBillingInterval);
+
+            const sid = currentChatSessionId;
+            currentChatSessionId = null;
+
+            if (sid) {
+                try {
+                    await fetch(getApiEndpoint('/sessions/end.php'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sid, rating: 5 })
+                    });
+                } catch (e) {
+                    console.error('Error ending chat session:', e);
+                }
+            }
+
+            document.getElementById('chat-modal').classList.add('hidden');
+            const mins = Math.floor(chatActiveSeconds / 60);
+            const secs = chatActiveSeconds % 60;
+            alert(`✅ சாட் ஆலோசனை நிறைவடைந்தது!\n\nகால அளவு: ${mins} நிமிடம் ${secs} வினாடி\nகட்டணம்: ₹${chatTotalDeducted.toFixed(2)}\nமீதமுள்ள வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\n\nகுருஜியின் ஆசிகள்! 🌟`);
         }
 
         function closeChatModal() {
-            if (chatPollTimer) clearInterval(chatPollTimer);
-            if (chatStatusPollTimer) clearInterval(chatStatusPollTimer);
-            if (currentChatSessionId) {
-                fetch(getApiEndpoint('/sessions/end.php'), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: currentChatSessionId, rating: 5 })
-                }).catch(() => {});
-                currentChatSessionId = null;
-            }
-            document.getElementById('chat-modal').classList.add('hidden');
+            endLiveChatSession();
         }
 
         async function sendChatMessage(e) {
