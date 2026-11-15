@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -672,22 +673,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   static Widget _quickAction(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: color.withAlpha(46),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withAlpha(128)),
-            ),
-            child: Icon(icon, color: color, size: 26),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        splashColor: color.withAlpha(50),
+        highlightColor: color.withAlpha(25),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      color.withAlpha(50),
+                      color.withAlpha(20),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: color.withAlpha(140), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(color: color.withAlpha(30), blurRadius: 10, offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: Center(child: Icon(icon, color: color, size: 26)),
+              ),
+              const SizedBox(height: 8),
+              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
-        ],
+        ),
       ),
     );
   }
@@ -767,20 +789,141 @@ class _AstrologersListScreenState extends State<AstrologersListScreen> {
           body: RefreshIndicator(
             onRefresh: () => _fetch(),
             color: AstroTheme.solarYellow,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: UserState.astrologers.length,
-              itemBuilder: (context, index) {
-                final astro = UserState.astrologers[index];
-                return AstrologerCard(
-                  key: ValueKey('list_astro_${astro['id']}_${astro['call_status']}'),
-                  astrologer: astro,
-                );
-              },
-            ),
+            child: UserState.astrologers.isEmpty
+                ? (_isRefreshing
+                    ? ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: 3,
+                        itemBuilder: (_, __) => const AstroCardSkeleton(),
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_off_outlined, size: 54, color: AstroTheme.solarYellow.withAlpha(150)),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'No Astrologers Available Currently',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Please pull down or tap refresh to update live status.',
+                              style: TextStyle(color: Colors.white60, fontSize: 12),
+                            ),
+                            const SizedBox(height: 18),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AstroTheme.solarYellow,
+                                foregroundColor: AstroTheme.emeraldNight,
+                                minimumSize: const Size(140, 46),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              onPressed: () => _fetch(),
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Refresh Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: UserState.astrologers.length,
+                    itemBuilder: (context, index) {
+                      final astro = UserState.astrologers[index];
+                      return AstrologerCard(
+                        key: ValueKey('list_astro_${astro['id']}_${astro['call_status']}'),
+                        astrologer: astro,
+                      );
+                    },
+                  ),
           ),
         );
       },
+    );
+  }
+}
+
+// Structural Skeleton Card for smooth loading (UI Skills Playbook Pattern)
+class AstroCardSkeleton extends StatelessWidget {
+  const AstroCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AstroTheme.forestSurface.withAlpha(160),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AstroTheme.borderGreen.withAlpha(120)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withAlpha(20),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 150,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(25),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 130,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(color: AstroTheme.borderSubtle, height: 1),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(3, (i) => Expanded(
+              child: Container(
+                height: 44,
+                margin: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            )),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -811,13 +954,28 @@ class AstrologerCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AstroTheme.forestSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isOnline ? AstroTheme.emeraldAccent.withAlpha(90) : AstroTheme.borderGreen,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            isOnline ? const Color(0xFF0C2B21) : AstroTheme.forestSurface,
+            const Color(0xFF051712),
+          ],
         ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isOnline ? AstroTheme.solarYellow.withAlpha(120) : AstroTheme.borderGreen,
+          width: isOnline ? 1.3 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isOnline ? AstroTheme.solarYellow.withAlpha(20) : Colors.black.withAlpha(100),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -828,19 +986,22 @@ class AstrologerCard extends StatelessWidget {
               Stack(
                 children: [
                   CircleAvatar(
-                    radius: 34,
+                    radius: 36,
                     backgroundImage: safeAstroImage(astrologer['image']),
                   ),
                   Positioned(
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      width: 14,
-                      height: 14,
+                      width: 16,
+                      height: 16,
                       decoration: BoxDecoration(
                         color: statusColor,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AstroTheme.forestSurface, width: 2),
+                        border: Border.all(color: const Color(0xFF051712), width: 2.5),
+                        boxShadow: isOnline
+                            ? [BoxShadow(color: statusColor.withAlpha(160), blurRadius: 6)]
+                            : null,
                       ),
                     ),
                   ),
@@ -858,12 +1019,12 @@ class AstrologerCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             astrologer['name'],
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: statusColor.withAlpha(35),
                             borderRadius: BorderRadius.circular(8),
@@ -890,14 +1051,14 @@ class AstrologerCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       astrologer['speciality'],
-                      style: const TextStyle(color: AstroTheme.textMint, fontSize: 11),
+                      style: const TextStyle(color: AstroTheme.textMint, fontSize: 12, height: 1.3),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       'Exp: ${astrologer['experience']} yrs • ${astrologer['languages']}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -916,11 +1077,11 @@ class AstrologerCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           const Divider(color: AstroTheme.borderSubtle, height: 1),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // CTAs (Audio Call, Video Call, Chat)
+          // CTAs (Audio Call, Video Call, Chat) with 44px+ touch targets and breathing room
           Opacity(
             opacity: isOnline ? 1.0 : 0.65,
             child: Row(
@@ -931,28 +1092,44 @@ class AstrologerCard extends StatelessWidget {
                       foregroundColor: isOnline ? AstroTheme.emeraldAccent : Colors.white60,
                       side: BorderSide(color: isOnline ? AstroTheme.emeraldAccent : Colors.white24),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     ),
                     onPressed: () => _startConsultation(context, 'chat', chatRate),
-                    icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                    label: Text('Chat ₹${chatRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                    label: Text(
+                      'Chat ₹${chatRate.toInt()}/m',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isOnline ? AstroTheme.solarYellow : Colors.white24,
                       foregroundColor: isOnline ? AstroTheme.emeraldNight : Colors.white70,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     ),
                     onPressed: () => _startConsultation(context, 'audio', audioRate),
-                    icon: const Icon(Icons.call, size: 14),
-                    label: Text('Call ₹${audioRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.call, size: 15),
+                    label: Text(
+                      'Call ₹${audioRate.toInt()}/m',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -960,11 +1137,19 @@ class AstrologerCard extends StatelessWidget {
                       backgroundColor: isOnline ? AstroTheme.solarYellow.withAlpha(25) : Colors.transparent,
                       side: BorderSide(color: isOnline ? AstroTheme.solarYellow : Colors.white24),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     ),
                     onPressed: () => _startConsultation(context, 'video', videoRate),
-                    icon: const Icon(Icons.videocam, size: 14),
-                    label: Text('Video ₹${videoRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.videocam, size: 15),
+                    label: Text(
+                      'Video ₹${videoRate.toInt()}/m',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -2581,7 +2766,12 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> with WidgetsB
                     const SizedBox(width: 6),
                     Text(
                       'LIVE VIDEO • $durationText',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ],
                 ),
@@ -2670,7 +2860,12 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> with WidgetsB
               const SizedBox(width: 8),
               Text(
                 'Agora RTC Voice Call • $durationText',
-                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  color: AstroTheme.solarYellow,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
               ),
             ],
           ),
@@ -3321,7 +3516,13 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(height: 10),
                   Text(
                     '₹${UserState.walletBalance.toStringAsFixed(2)}',
-                    style: const TextStyle(color: AstroTheme.solarYellow, fontSize: 34, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: const TextStyle(
+                      color: AstroTheme.solarYellow,
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
                   ),
                   const SizedBox(height: 10),
                   const Text('✓ 100% Usable for Audio, Video, and Chat Consultations with verified Astrologers', style: TextStyle(color: AstroTheme.textMint, fontSize: 11)),
@@ -3333,7 +3534,7 @@ class _WalletScreenState extends State<WalletScreen> {
             const Text('Instant Recharge Packs (உடனடி ரீசார்ஜ்)', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            // Packs Grid
+            // Packs Grid with minimum 48px touch targets & tabular figures
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -3347,11 +3548,19 @@ class _WalletScreenState extends State<WalletScreen> {
                         backgroundColor: isPopular ? const Color(0xFF0F3E30) : AstroTheme.forestSurface,
                         foregroundColor: AstroTheme.solarYellow,
                         side: BorderSide(color: isPopular ? AstroTheme.solarYellow : AstroTheme.borderGreen, width: isPopular ? 1.5 : 1.0),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        minimumSize: const Size(96, 48),
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                       ),
                       onPressed: () => _openGateway(amt),
-                      child: Text('+ ₹$amt', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        '+ ₹$amt',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
                     if (isPopular)
                       Positioned(
