@@ -748,7 +748,7 @@ try {
     <!-- FOOTER -->
     <footer class="mt-auto border-t border-astro-emerald/20 bg-astro-base/90 pt-12 pb-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 pb-8 border-b border-astro-emerald/15">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-8 pb-8 border-b border-astro-emerald/15">
                 <div class="space-y-3">
                     <div class="flex items-center gap-2">
                         <img src="assets/logo.jpg" alt="Logo" class="w-8 h-8 rounded-lg border border-astro-gold">
@@ -774,7 +774,17 @@ try {
                     <ul class="space-y-2 text-xs text-white/70">
                         <li><a href="#panchangam" class="hover:text-astro-gold">இன்றைய பஞ்சாங்கம்</a></li>
                         <li><button onclick="openWalletModal()" class="hover:text-astro-gold">வாலட் ரீசார்ஜ்</button></li>
-                        <li><a href="admin/settings.php" target="_blank" class="hover:text-astro-gold">Super Admin Panel</a></li>
+                        <li><a href="admin/index.php" target="_blank" class="hover:text-astro-gold">Super Admin Panel</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-xs uppercase tracking-wider text-astro-gold mb-3">கொள்கைகள் & சட்டம்</h4>
+                    <ul class="space-y-2 text-xs text-white/70">
+                        <li><a href="privacy.php" target="_blank" class="hover:text-astro-gold">தனியுரிமைக் கொள்கை (Privacy)</a></li>
+                        <li><a href="terms.php" target="_blank" class="hover:text-astro-gold">விதிமுறைகள் (Terms)</a></li>
+                        <li><a href="delete_account.php" target="_blank" class="text-red-300 hover:text-red-200">கணக்கு நீக்கம் (Delete Account)</a></li>
+                        <li><a href="refund.php" target="_blank" class="hover:text-astro-gold">ரீஃபண்ட் கொள்கை (Refunds)</a></li>
                     </ul>
                 </div>
 
@@ -782,13 +792,21 @@ try {
                     <h4 class="font-bold text-xs uppercase tracking-wider text-astro-gold mb-3">உதவி & ஆதரவு</h4>
                     <p class="text-xs text-white/60 mb-2">24/7 வாடிக்கையாளர் உதவி மையம்</p>
                     <p class="text-xs text-astro-gold font-bold">support@astrosubam.com</p>
-                    <p class="text-xs text-white/70 mt-1">+91 99988 87770</p>
+                    <p class="text-xs text-white/70 mt-1">+91 99447 00648</p>
                 </div>
             </div>
 
-            <div class="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-white/50 gap-2">
+            <div class="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-white/50 gap-3">
                 <p>© 2026 AstroSubam.com. All Rights Reserved. Auspicious Vedic Jyotish Consultation.</p>
-                <p class="text-astro-gold/70">Sacred Green & Solar Gold Edition</p>
+                <div class="flex items-center gap-3 text-[11px]">
+                    <a href="privacy.php" class="hover:text-astro-gold">Privacy Policy</a>
+                    <span>•</span>
+                    <a href="terms.php" class="hover:text-astro-gold">Terms of Service</a>
+                    <span>•</span>
+                    <a href="delete_account.php" class="hover:text-red-400">Delete Account</a>
+                    <span>•</span>
+                    <a href="refund.php" class="hover:text-astro-gold">Refund Policy</a>
+                </div>
             </div>
         </div>
     </footer>

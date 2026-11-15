@@ -511,6 +511,54 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text('Mobile: +91 ${UserState.userPhone}', style: const TextStyle(color: Colors.white70)),
                         const SizedBox(height: 6),
                         Text('Wallet Balance: ₹${UserState.walletBalance.toStringAsFixed(2)}', style: const TextStyle(color: AstroTheme.emeraldAccent, fontWeight: FontWeight.bold)),
+                        const Divider(color: AstroTheme.borderSubtle, height: 20),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            showDialog(
+                              context: context,
+                              builder: (dCtx) => AlertDialog(
+                                backgroundColor: AstroTheme.forestSurface,
+                                title: const Text('Delete Account & Data', style: TextStyle(color: Colors.redAccent)),
+                                content: const Text(
+                                  'Are you sure you want to permanently delete your account and associated personal data? This cannot be undone.\n\nWeb Request: https://subam.navanagari.com/delete_account.php',
+                                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dCtx),
+                                    child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    onPressed: () async {
+                                      Navigator.pop(dCtx);
+                                      await ApiService.post('auth/delete_account.php', {'phone': UserState.userPhone});
+                                      UserState.isLoggedIn = false;
+                                      if (mounted) {
+                                        setState(() {});
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Your account and data have been permanently deleted.')),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Delete Permanently', style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4.0),
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_forever, size: 16, color: Colors.redAccent),
+                                SizedBox(width: 8),
+                                Text('Delete Account & Data (Google Play)', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     actions: [
