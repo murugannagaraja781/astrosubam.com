@@ -6,6 +6,7 @@ declare(strict_types=1);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+$_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../helpers/Settings.php';
@@ -14,9 +15,56 @@ require_once __DIR__ . '/../helpers/AgoraToken.php';
 $ADMIN_PASSWORD = 'Admin@2026';
 $ADMIN_USER = 'admin';
 
+// Auto-ensure admins table exists & default seed
+function ensureAdminsTable(PDO $db): void {
+    static $ensured = false;
+    if ($ensured) return;
+    $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver === 'sqlite') {
+        $db->exec("CREATE TABLE IF NOT EXISTS `admins` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+            `username` TEXT UNIQUE NOT NULL,
+            `email` TEXT,
+            `password` TEXT NOT NULL,
+            `name` TEXT NOT NULL,
+            `role` TEXT DEFAULT 'super_admin',
+            `status` TEXT DEFAULT 'active',
+            `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+        )");
+    } else {
+        $db->exec("CREATE TABLE IF NOT EXISTS `admins` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `username` VARCHAR(100) UNIQUE NOT NULL,
+            `email` VARCHAR(150) NULL,
+            `password` VARCHAR(255) NOT NULL,
+            `name` VARCHAR(150) NOT NULL,
+            `role` VARCHAR(50) DEFAULT 'super_admin',
+            `status` VARCHAR(20) DEFAULT 'active',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (`username`),
+            INDEX (`status`)
+        ) ENGINE=InnoDB");
+    }
+
+    $st = $db->query("SELECT COUNT(*) FROM admins");
+    if ((int)$st->fetchColumn() === 0) {
+        $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
+        $ins = $db->prepare("INSERT INTO admins (username, email, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?)");
+        $ins->execute(['admin', 'admin@astrosubam.com', $hashed, 'Master Super Admin', 'super_admin', 'active']);
+    }
+    $ensured = true;
+}
+
 // Handle Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     unset($_SESSION['astro_admin_logged']);
+    unset($_SESSION['astro_admin_id']);
+    unset($_SESSION['astro_admin_user']);
+    unset($_SESSION['astro_admin_name']);
+    unset($_SESSION['astro_admin_role']);
+    unset($_SESSION['astro_admin_email']);
     session_destroy();
     header('Location: index.php');
     exit;
@@ -28,9 +76,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     $inputUser = trim($_POST['username'] ?? '');
     $inputPass = trim($_POST['password'] ?? '');
 
-    if (($inputUser === $ADMIN_USER || $inputUser === 'admin@astrosubam.com') && $inputPass === $ADMIN_PASSWORD) {
+    $adminFound = null;
+
+    try {
+        $db = getDb();
+        ensureAdminsTable($db);
+        $st = $db->prepare("SELECT * FROM admins WHERE (LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)) AND status = 'active' LIMIT 1");
+        $st->execute([$inputUser, $inputUser]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            if (password_verify($inputPass, $row['password']) || $row['password'] === $inputPass) {
+                $adminFound = $row;
+            }
+        }
+    } catch (\Throwable $e) {
+        // Fallback to hardcoded master credentials below
+    }
+
+    // Master Failsafe Fallback
+    if (!$adminFound && ($inputUser === $ADMIN_USER || $inputUser === 'admin@astrosubam.com') && $inputPass === $ADMIN_PASSWORD) {
+        $adminFound = [
+            'id' => 1,
+            'username' => 'admin',
+            'name' => 'Master Super Admin',
+            'role' => 'super_admin',
+            'email' => 'admin@astrosubam.com'
+        ];
+    }
+
+    if ($adminFound) {
         $_SESSION['astro_admin_logged'] = true;
-        $_SESSION['astro_admin_user'] = $inputUser;
+        $_SESSION['astro_admin_id'] = (int)$adminFound['id'];
+        $_SESSION['astro_admin_user'] = $adminFound['username'];
+        $_SESSION['astro_admin_name'] = $adminFound['name'];
+        $_SESSION['astro_admin_role'] = $adminFound['role'] ?? 'super_admin';
+        $_SESSION['astro_admin_email'] = $adminFound['email'] ?? '';
         header('Location: index.php');
         exit;
     } else {
@@ -336,12 +416,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_env_bak'])) {
     }
 }
 
+// 8. Action: Create New Super Admin
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_super_admin'])) {
+    ensureAdminsTable($db);
+    $name = trim($_POST['admin_name'] ?? '');
+    $username = strtolower(trim($_POST['admin_username'] ?? ''));
+    $email = trim($_POST['admin_email'] ?? '');
+    $password = trim($_POST['admin_password'] ?? '');
+    $role = trim($_POST['admin_role'] ?? 'super_admin');
+    $status = trim($_POST['admin_status'] ?? 'active');
+
+    if (empty($name) || empty($username) || empty($password)) {
+        $toastMessage = '❌ பெயர், பயனர் பெயர் மற்றும் கடவுச்சொல் அவசியமானது!';
+        $toastType = 'error';
+    } elseif (!preg_match('/^[a-zA-Z0-9_.-]{3,30}$/', $username)) {
+        $toastMessage = '❌ பயனர் பெயர் 3-30 எழுத்துக்கள் கொண்டிருக்க வேண்டும் (ஆங்கில எழுத்துக்கள், எண்கள், _ . - மட்டும்)!';
+        $toastType = 'error';
+    } elseif (strlen($password) < 6) {
+        $toastMessage = '❌ கடவுச்சொல் குறைந்தபட்சம் 6 எழுத்துக்கள் கொண்டிருக்க வேண்டும்!';
+        $toastType = 'error';
+    } else {
+        $chk = $db->prepare("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?))");
+        $chk->execute([$username, $email]);
+        if ((int)$chk->fetchColumn() > 0) {
+            $toastMessage = "❌ '{$username}' பயனர் பெயர் அல்லது மின்னஞ்சல் ஏற்கனவே பயன்பாட்டில் உள்ளது!";
+            $toastType = 'error';
+        } else {
+            $hashedPass = password_hash($password, PASSWORD_BCRYPT);
+            $ins = $db->prepare("INSERT INTO admins (username, email, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?)");
+            $ins->execute([$username, $email, $hashedPass, $name, $role, $status]);
+            $toastMessage = "✅ புதிய Super Admin '{$name}' (@{$username}) வெற்றிகரமாக உருவாக்கப்பட்டது!";
+            $toastType = 'success';
+        }
+    }
+}
+
+// 9. Action: Toggle Admin Status
+if (isset($_GET['toggle_admin_id'])) {
+    ensureAdminsTable($db);
+    $targetId = (int)$_GET['toggle_admin_id'];
+    $currentStatus = $_GET['status'] ?? 'active';
+    $currentLoggedId = (int)($_SESSION['astro_admin_id'] ?? 0);
+    $currentLoggedUser = $_SESSION['astro_admin_user'] ?? '';
+
+    $st = $db->prepare("SELECT username FROM admins WHERE id = ?");
+    $st->execute([$targetId]);
+    $tUser = $st->fetchColumn();
+
+    if ($targetId === $currentLoggedId || $tUser === $currentLoggedUser) {
+        $toastMessage = '⚠️ நீங்கள் தற்போது லாகின் செய்துள்ள சொந்த கணக்கின் நிலையை மாற்ற முடியாது!';
+        $toastType = 'error';
+    } else {
+        $newStatus = ($currentStatus === 'active') ? 'inactive' : 'active';
+        $db->prepare("UPDATE admins SET status = ? WHERE id = ?")->execute([$newStatus, $targetId]);
+        header('Location: index.php?tab=admins');
+        exit;
+    }
+}
+
+// 10. Action: Delete Super Admin
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_admin_id'])) {
+    ensureAdminsTable($db);
+    $targetId = (int)$_POST['delete_admin_id'];
+    $currentLoggedId = (int)($_SESSION['astro_admin_id'] ?? 0);
+    $currentLoggedUser = $_SESSION['astro_admin_user'] ?? '';
+
+    $st = $db->prepare("SELECT username, role FROM admins WHERE id = ?");
+    $st->execute([$targetId]);
+    $targetAdmin = $st->fetch(PDO::FETCH_ASSOC);
+
+    if (!$targetAdmin) {
+        $toastMessage = '❌ நிர்வாகி கணக்கு கிடைக்கவில்லை!';
+        $toastType = 'error';
+    } elseif ($targetId === $currentLoggedId || $targetAdmin['username'] === $currentLoggedUser) {
+        $toastMessage = '⚠️ நீங்கள் தற்போது லாகின் செய்துள்ள சொந்த கணக்கை நீக்க முடியாது!';
+        $toastType = 'error';
+    } else {
+        $superCount = (int)$db->query("SELECT COUNT(*) FROM admins WHERE role = 'super_admin'")->fetchColumn();
+        if ($targetAdmin['role'] === 'super_admin' && $superCount <= 1) {
+            $toastMessage = '⚠️ அமைப்பில் உள்ள ஒரே ஒரு Super Admin கணக்கை நீக்க முடியாது!';
+            $toastType = 'error';
+        } else {
+            $db->prepare("DELETE FROM admins WHERE id = ?")->execute([$targetId]);
+            $toastMessage = "✅ நிர்வாகி கணக்கு (@{$targetAdmin['username']}) வெற்றிகரமாக நீக்கப்பட்டது!";
+            $toastType = 'success';
+        }
+    }
+}
+
+// 11. Action: Reset Admin Password
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reset_admin_password'])) {
+    ensureAdminsTable($db);
+    $targetId = (int)($_POST['target_admin_id'] ?? 0);
+    $newPass = trim($_POST['new_password'] ?? '');
+
+    if (empty($newPass) || strlen($newPass) < 6) {
+        $toastMessage = '❌ புதிய கடவுச்சொல் குறைந்தபட்சம் 6 எழுத்துக்கள் கொண்டிருக்க வேண்டும்!';
+        $toastType = 'error';
+    } else {
+        $hashed = password_hash($newPass, PASSWORD_BCRYPT);
+        $db->prepare("UPDATE admins SET password = ? WHERE id = ?")->execute([$hashed, $targetId]);
+        $toastMessage = '✅ நிர்வாகியின் கடவுச்சொல் வெற்றிகரமாக புதுப்பிக்கப்பட்டது!';
+        $toastType = 'success';
+    }
+}
+
 // Data Queries for Dashboard
 $totalUsers = (int)$db->query("SELECT COUNT(*) FROM users")->fetchColumn();
 $totalAstrologers = (int)$db->query("SELECT COUNT(*) FROM astrologers")->fetchColumn();
 $onlineAstrologers = (int)$db->query("SELECT COUNT(*) FROM astrologers WHERE call_status = 'available'")->fetchColumn();
 $totalConsultations = (int)$db->query("SELECT COUNT(*) FROM consultation_sessions")->fetchColumn();
 $totalRechargeAmt = (float)$db->query("SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions WHERE type = 'credit'")->fetchColumn();
+
+// Admins List Query
+ensureAdminsTable($db);
+$adminsList = $db->query("SELECT * FROM admins ORDER BY id DESC")->fetchAll();
+$totalAdmins = count($adminsList);
+$activeAdmins = count(array_filter($adminsList, fn($a) => ($a['status'] ?? 'active') === 'active'));
 
 // List Queries
 $astrologersList = $db->query("SELECT * FROM astrologers ORDER BY id DESC")->fetchAll();
@@ -463,6 +654,9 @@ $activeTab = $_GET['tab'] ?? 'overview';
             <a href="?tab=overview" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'overview' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i> பொது பார்வை (Overview)
             </a>
+            <a href="?tab=admins" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'admins' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
+                <i data-lucide="shield-check" class="w-4 h-4"></i> நிர்வாகிகள் (Super Admins)
+            </a>
             <a href="?tab=astrologers" class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition <?= $activeTab === 'astrologers' ? 'bg-astro-gold text-astro-base shadow-md' : 'text-white/70 hover:bg-astro-card hover:text-white' ?>">
                 <i data-lucide="users" class="w-4 h-4"></i> ஜோதிடர்கள் (Astrologers)
             </a>
@@ -503,6 +697,7 @@ $activeTab = $_GET['tab'] ?? 'overview';
                 <h2 class="font-cinzel text-xl font-bold text-white capitalize">
                     <?php 
                     if ($activeTab === 'overview') echo '📊 நிர்வாகப் பொதுப் பார்வை (Admin Overview)';
+                    elseif ($activeTab === 'admins') echo '🛡️ சூப்பர் அட்மின்கள் மேலாண்மை (Super Admins Management)';
                     elseif ($activeTab === 'astrologers') echo '🧘‍♂️ ஜோதிடர்கள் மேலாண்மை (Astrologers Directory)';
                     elseif ($activeTab === 'consultations') echo '📞 நேரலை ஆலோசனைகள் வரலாறு (Consultation Log)';
                     elseif ($activeTab === 'wallet') echo '💰 வாலட் பரிவர்த்தனைகள் (Wallet & Ledger)';
@@ -523,6 +718,18 @@ $activeTab = $_GET['tab'] ?? 'overview';
                 </a>
             </div>
         </header>
+
+        <!-- Mobile Responsive Tab Navigation -->
+        <div class="md:hidden bg-astro-surface border-b border-astro-border px-4 py-2.5 overflow-x-auto flex items-center gap-2 text-xs font-semibold whitespace-nowrap">
+            <a href="?tab=overview" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'overview' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Overview</a>
+            <a href="?tab=admins" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 <?= $activeTab === 'admins' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Super Admins</a>
+            <a href="?tab=astrologers" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'astrologers' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Astrologers</a>
+            <a href="?tab=consultations" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'consultations' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Sessions</a>
+            <a href="?tab=wallet" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'wallet' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Wallet</a>
+            <a href="?tab=agora" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'agora' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Agora Config</a>
+            <a href="?tab=env" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'env' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">.env Editor</a>
+            <a href="?tab=support" class="px-3 py-1.5 rounded-lg <?= $activeTab === 'support' ? 'bg-astro-gold text-astro-base font-bold' : 'text-white/70 bg-astro-card' ?>">Support</a>
+        </div>
 
         <!-- Main Body Content -->
         <main class="flex-1 p-6 overflow-y-auto space-y-6">
@@ -624,6 +831,271 @@ $activeTab = $_GET['tab'] ?? 'overview';
                     </table>
                 </div>
             </div>
+            <?php endif; ?>
+
+            <!-- ============================================== -->
+            <!-- TAB: SUPER ADMINS MANAGEMENT -->
+            <!-- ============================================== -->
+            <?php if ($activeTab === 'admins'): ?>
+            <div class="space-y-6">
+
+                <!-- 3 Overview Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <div class="glass-card p-5 rounded-2xl border-l-4 border-l-astro-gold">
+                        <div class="flex items-center justify-between text-white/60 text-xs mb-2">
+                            <span>மொத்த நிர்வாகிகள் (Total Admins)</span>
+                            <i data-lucide="shield-check" class="w-4 h-4 text-astro-gold"></i>
+                        </div>
+                        <span class="font-cinzel text-2xl font-bold text-astro-gold"><?= $totalAdmins ?></span>
+                        <p class="text-[11px] text-astro-textMint mt-1">கணினி நிர்வாகப் பயனர் கணக்குகள்</p>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl border-l-4 border-l-astro-emerald">
+                        <div class="flex items-center justify-between text-white/60 text-xs mb-2">
+                            <span>செயலில் உள்ளவர்கள் (Active Admins)</span>
+                            <i data-lucide="user-check" class="w-4 h-4 text-astro-emerald"></i>
+                        </div>
+                        <span class="font-cinzel text-2xl font-bold text-astro-emerald"><?= $activeAdmins ?></span>
+                        <p class="text-[11px] text-white/50 mt-1">அணுகல் அனுமதிக்கப்பட்ட கணக்குகள்</p>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl border-l-4 border-l-amber-500">
+                        <div class="flex items-center justify-between text-white/60 text-xs mb-2">
+                            <span>தற்போதைய அமர்வு (Active Session)</span>
+                            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+                        </div>
+                        <span class="text-sm font-bold text-white"><?= htmlspecialchars($_SESSION['astro_admin_name'] ?? 'Master Admin') ?></span>
+                        <p class="text-[11px] text-astro-gold mt-1">@<?= htmlspecialchars($_SESSION['astro_admin_user'] ?? 'admin') ?> • <span class="uppercase"><?= htmlspecialchars($_SESSION['astro_admin_role'] ?? 'super_admin') ?></span></p>
+                    </div>
+                </div>
+
+                <!-- Main Grid: Form + List -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- Left: Create New Super Admin Form (5 cols) -->
+                    <div class="lg:col-span-5 glass-card p-6 rounded-2xl border border-astro-gold/30 h-fit">
+                        <div class="flex items-center gap-2 mb-4 pb-3 border-b border-astro-border">
+                            <i data-lucide="user-plus" class="w-5 h-5 text-astro-gold"></i>
+                            <div>
+                                <h3 class="font-cinzel text-base font-bold text-white">புதிய Super Admin சேர்க்க</h3>
+                                <p class="text-[11px] text-white/60">Create New Administrator Account</p>
+                            </div>
+                        </div>
+
+                        <form method="POST" action="index.php?tab=admins" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block text-white/80 font-semibold mb-1">நிர்வாகி முழு பெயர் (Full Name) *</label>
+                                <input type="text" name="admin_name" required placeholder="எ.கா. கார்த்திக் சுப்ரமணியன்" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-astro-gold transition">
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-white/80 font-semibold mb-1">பயனர் பெயர் (Username) *</label>
+                                    <input type="text" name="admin_username" required placeholder="எ.கா. karthik_admin" pattern="[a-zA-Z0-9_.-]{3,30}" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-astro-gold transition">
+                                    <p class="text-[10px] text-white/40 mt-1">3-30 எழுத்துக்கள் (a-z, 0-9, _ -)</p>
+                                </div>
+                                <div>
+                                    <label class="block text-white/80 font-semibold mb-1">மின்னஞ்சல் (Email)</label>
+                                    <input type="email" name="admin_email" placeholder="admin@astrosubam.com" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-astro-gold transition">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-white/80 font-semibold mb-1">கடவுச்சொல் (Password) *</label>
+                                <div class="relative">
+                                    <input type="password" id="newAdminPassword" name="admin_password" required minlength="6" placeholder="குறைந்தபட்சம் 6 எழுத்துக்கள்" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 pr-10 text-white focus:outline-none focus:border-astro-gold transition">
+                                    <button type="button" onclick="togglePassVisibility('newAdminPassword', this)" class="absolute right-3 top-2.5 text-white/40 hover:text-white">
+                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-white/80 font-semibold mb-1">நிர்வாகி பங்கு (Role)</label>
+                                    <select name="admin_role" class="w-full bg-astro-card border border-astro-border rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-astro-gold">
+                                        <option value="super_admin">🛡️ Super Admin (Full Control)</option>
+                                        <option value="finance_admin">💰 Finance Admin (Wallet & Billing)</option>
+                                        <option value="support_admin">🎫 Support Admin (Tickets & Clients)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-white/80 font-semibold mb-1">நிலை (Status)</label>
+                                    <select name="admin_status" class="w-full bg-astro-card border border-astro-border rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-astro-gold">
+                                        <option value="active">🟢 Active (செயலில்)</option>
+                                        <option value="inactive">⚪ Inactive (முடக்கம்)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button type="submit" name="create_super_admin" class="btn-gold w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg mt-2">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i> புதிய Super Admin உருவாக்கு (Create Admin)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right: Existing Super Admins Table (7 cols) -->
+                    <div class="lg:col-span-7 glass-card p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-astro-border">
+                            <div>
+                                <h3 class="font-cinzel text-base font-bold text-white flex items-center gap-2">
+                                    <i data-lucide="shield" class="w-5 h-5 text-astro-gold"></i>
+                                    நிர்வாகிகள் பட்டியல் (Administrators Directory)
+                                </h3>
+                                <p class="text-[11px] text-white/60 mt-0.5">கணினி மேலாண்மை அனுமதி பெற்ற அனைத்து நிர்வாகிகள்</p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-lg bg-astro-card border border-astro-border text-[11px] text-astro-gold font-bold">
+                                <?= count($adminsList) ?> நிர்வாகிகள்
+                            </span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-astro-border text-white/60">
+                                        <th class="pb-3 font-semibold">நிர்வாகி (Admin)</th>
+                                        <th class="pb-3 font-semibold">பங்கு (Role)</th>
+                                        <th class="pb-3 font-semibold">நிலை (Status)</th>
+                                        <th class="pb-3 font-semibold text-right">செயல்கள் (Actions)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-astro-border/50">
+                                    <?php foreach ($adminsList as $adm): 
+                                        $isSelf = ((int)($_SESSION['astro_admin_id'] ?? 0) === (int)$adm['id']) || ($_SESSION['astro_admin_user'] === $adm['username']);
+                                        $isActive = ($adm['status'] ?? 'active') === 'active';
+                                        $roleLabel = match($adm['role']) {
+                                            'finance_admin' => 'Finance Admin',
+                                            'support_admin' => 'Support Admin',
+                                            default => 'Super Admin'
+                                        };
+                                        $roleColor = match($adm['role']) {
+                                            'finance_admin' => 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                                            'support_admin' => 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+                                            default => 'bg-astro-gold/20 text-astro-gold border-astro-gold/30'
+                                        };
+                                    ?>
+                                    <tr class="hover:bg-white/[0.02] transition">
+                                        <td class="py-3.5 pr-2">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-astro-gold to-astro-goldAmber text-astro-base font-bold flex items-center justify-center flex-shrink-0 text-xs shadow-sm">
+                                                    <?= strtoupper(substr($adm['name'], 0, 1)) ?>
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="font-bold text-white truncate"><?= htmlspecialchars($adm['name']) ?></span>
+                                                        <?php if ($isSelf): ?>
+                                                            <span class="px-1.5 py-0.5 rounded text-[9px] bg-astro-emerald/20 text-astro-emerald font-bold border border-astro-emerald/30">YOU</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <span class="text-[11px] text-astro-textMint">@<?= htmlspecialchars($adm['username']) ?></span>
+                                                    <?php if (!empty($adm['email'])): ?>
+                                                        <span class="text-[10px] text-white/40 block truncate"><?= htmlspecialchars($adm['email']) ?></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3.5 px-2">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border <?= $roleColor ?>">
+                                                <?= $roleLabel ?>
+                                            </span>
+                                        </td>
+                                        <td class="py-3.5 px-2">
+                                            <?php if ($isSelf): ?>
+                                                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-astro-emerald/20 text-astro-emerald border border-astro-emerald/30 flex items-center gap-1 w-max">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-astro-emerald animate-pulse"></span> Active (You)
+                                                </span>
+                                            <?php else: ?>
+                                                <a href="?tab=admins&toggle_admin_id=<?= (int)$adm['id'] ?>&status=<?= htmlspecialchars($adm['status']) ?>" class="px-2 py-1 rounded-full text-[10px] font-bold border transition flex items-center gap-1 w-max <?= $isActive ? 'bg-astro-emerald/20 text-astro-emerald border-astro-emerald/30 hover:bg-amber-500/20 hover:text-amber-300' : 'bg-red-500/20 text-red-300 border-red-500/30 hover:bg-astro-emerald/20 hover:text-astro-emerald' ?>" title="Click to toggle status">
+                                                    <span class="w-1.5 h-1.5 rounded-full <?= $isActive ? 'bg-astro-emerald' : 'bg-red-400' ?>"></span>
+                                                    <?= $isActive ? 'Active' : 'Inactive' ?>
+                                                </a>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-3.5 pl-2 text-right">
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <!-- Reset Password Trigger -->
+                                                <button type="button" onclick="openResetPasswordModal(<?= (int)$adm['id'] ?>, '<?= htmlspecialchars(addslashes($adm['name'])) ?>', '<?= htmlspecialchars(addslashes($adm['username'])) ?>')" class="p-1.5 rounded-lg bg-astro-card border border-astro-border text-white/70 hover:text-astro-gold hover:border-astro-gold transition" title="கடவுச்சொல்லை மாற்று (Reset Password)">
+                                                    <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                                                </button>
+
+                                                <!-- Delete Button (Only for others) -->
+                                                <?php if (!$isSelf): ?>
+                                                <form method="POST" action="index.php?tab=admins" onsubmit="return confirm('நிச்சயமாக இந்த Super Admin கணக்கை நீக்க விரும்புகிறீர்களா? (@<?= htmlspecialchars(addslashes($adm['username'])) ?>)');" class="inline">
+                                                    <input type="hidden" name="delete_admin_id" value="<?= (int)$adm['id'] ?>">
+                                                    <button type="submit" class="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition" title="நீக்குக (Delete Admin)">
+                                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                                    </button>
+                                                </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Reset Password Modal -->
+            <div id="resetPasswordModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+                <div class="w-full max-w-sm glass-card p-6 rounded-2xl border border-astro-gold/40 shadow-2xl relative">
+                    <div class="flex items-center justify-between pb-3 mb-4 border-b border-astro-border">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="key" class="w-4 h-4 text-astro-gold"></i>
+                            <h4 class="font-cinzel text-sm font-bold text-white">கடவுச்சொல் மாற்று</h4>
+                        </div>
+                        <button type="button" onclick="closeResetPasswordModal()" class="text-white/50 hover:text-white">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <form method="POST" action="index.php?tab=admins" class="space-y-4 text-xs">
+                        <input type="hidden" id="resetTargetAdminId" name="target_admin_id" value="">
+                        <p class="text-white/70">
+                            நிர்வாகி: <b id="resetTargetAdminName" class="text-astro-gold"></b> (<span id="resetTargetAdminUser" class="text-astro-textMint"></span>)
+                        </p>
+                        <div>
+                            <label class="block text-white/80 font-semibold mb-1">புதிய கடவுச்சொல் (New Password)</label>
+                            <input type="password" name="new_password" required minlength="6" placeholder="குறைந்தபட்சம் 6 எழுத்துக்கள்" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-astro-gold transition">
+                        </div>
+                        <div class="flex items-center justify-end gap-2 pt-2">
+                            <button type="button" onclick="closeResetPasswordModal()" class="px-4 py-2 rounded-xl bg-astro-card border border-astro-border text-white/70 hover:bg-astro-surface">ரத்து</button>
+                            <button type="submit" name="reset_admin_password" class="btn-gold px-4 py-2 rounded-xl font-bold flex items-center gap-1.5">
+                                <i data-lucide="check" class="w-3.5 h-3.5"></i> கடவுச்சொல்லை மாற்று
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                function togglePassVisibility(id, btn) {
+                    const input = document.getElementById(id);
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        btn.innerHTML = '<i data-lucide="eye-off" class="w-4 h-4"></i>';
+                    } else {
+                        input.type = 'password';
+                        btn.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
+                    }
+                    if (window.lucide) lucide.createIcons();
+                }
+
+                function openResetPasswordModal(id, name, username) {
+                    document.getElementById('resetTargetAdminId').value = id;
+                    document.getElementById('resetTargetAdminName').textContent = name;
+                    document.getElementById('resetTargetAdminUser').textContent = '@' + username;
+                    document.getElementById('resetPasswordModal').classList.remove('hidden');
+                }
+
+                function closeResetPasswordModal() {
+                    document.getElementById('resetPasswordModal').classList.add('hidden');
+                }
+            </script>
             <?php endif; ?>
 
             <!-- ============================================== -->

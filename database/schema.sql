@@ -129,3 +129,18 @@ CREATE TABLE IF NOT EXISTS `support_ticket_messages` (
     FOREIGN KEY (`ticket_id`) REFERENCES `support_tickets`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- 9. Super Admins Table
+CREATE TABLE IF NOT EXISTS `admins` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `username` VARCHAR(100) UNIQUE NOT NULL,
+    `email` VARCHAR(150) NULL,
+    `password` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(150) NOT NULL,
+    `role` VARCHAR(50) DEFAULT 'super_admin',
+    `status` VARCHAR(20) DEFAULT 'active',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX (`username`),
+    INDEX (`status`)
+) ENGINE=InnoDB;
+

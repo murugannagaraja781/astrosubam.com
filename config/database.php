@@ -144,6 +144,18 @@ try {
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 )");
 
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `admins` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `username` TEXT UNIQUE NOT NULL,
+                    `email` TEXT,
+                    `password` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `role` TEXT DEFAULT 'super_admin',
+                    `status` TEXT DEFAULT 'active',
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+
                 // Seed test user and astrologer if empty
                 $cnt = $pdo->query("SELECT COUNT(*) FROM astrologers")->fetchColumn();
                 if ($cnt == 0) {
