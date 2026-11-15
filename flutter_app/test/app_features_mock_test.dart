@@ -266,9 +266,9 @@ void main() {
       expect(find.text('Guruji S. Sundaramurthy'), findsOneWidget);
 
       // Check Master Status Multi-Toggle Pill Bar
-      expect(find.textContaining('Call: ON'), findsOneWidget);
-      expect(find.textContaining('Chat: ON'), findsOneWidget);
-      expect(find.textContaining('Video: ON'), findsOneWidget);
+      expect(find.textContaining('Call:'), findsOneWidget);
+      expect(find.textContaining('Chat:'), findsOneWidget);
+      expect(find.textContaining('Video:'), findsOneWidget);
 
       // Check Metrics Quick-Glance Cards
       expect(find.text("Today's Earnings"), findsOneWidget);

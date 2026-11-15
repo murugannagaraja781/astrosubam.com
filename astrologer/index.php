@@ -13,7 +13,7 @@ $success = '';
 
 // Handle Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    unset($_SESSION['astrologer_id'], $_SESSION['astrologer_name'], $_SESSION['astrologer_phone']);
+    unset($_SESSION['astrologer_id'], $_SESSION['astrologer_name'], $_SESSION['astrologer_phone'], $_SESSION['role']);
     session_destroy();
     header('Location: index.php');
     exit;
@@ -65,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_astrologer'])) 
                 $_SESSION['astrologer_id'] = (int)$astro['id'];
                 $_SESSION['astrologer_name'] = $astro['name'];
                 $_SESSION['astrologer_phone'] = $astro['phone'];
+                $_SESSION['role'] = 'astrologer';
                 header('Location: index.php');
                 exit;
             }
@@ -84,30 +85,23 @@ if (isset($_GET['demo_id'])) {
         $_SESSION['astrologer_id'] = (int)$astro['id'];
         $_SESSION['astrologer_name'] = $astro['name'];
         $_SESSION['astrologer_phone'] = $astro['phone'];
+        $_SESSION['role'] = 'astrologer';
         header('Location: index.php');
         exit;
     }
 }
 
-// Check Current Logged-in Astrologer (Defaults to Verified Guruji for Instant Live Operations)
-$astrologerId = $_SESSION['astrologer_id'] ?? 1;
+// Check Current Logged-in Astrologer (Requires verified astrologer session & role)
+$astrologerId = (isset($_SESSION['astrologer_id']) && ($_SESSION['role'] ?? '') === 'astrologer') ? (int)$_SESSION['astrologer_id'] : 0;
 $currentAstro = null;
 
 if ($astrologerId > 0) {
     $stmt = $db->prepare("SELECT * FROM astrologers WHERE id = ?");
     $stmt->execute([$astrologerId]);
     $currentAstro = $stmt->fetch();
-}
-
-if (!$currentAstro) {
-    // Fallback to first verified astrologer in DB
-    $fStmt = $db->query("SELECT * FROM astrologers ORDER BY id ASC LIMIT 1");
-    $currentAstro = $fStmt->fetch();
-    if ($currentAstro) {
-        $astrologerId = (int)$currentAstro['id'];
-        $_SESSION['astrologer_id'] = $astrologerId;
-        $_SESSION['astrologer_name'] = $currentAstro['name'];
-        $_SESSION['astrologer_phone'] = $currentAstro['phone'];
+    if (!$currentAstro) {
+        unset($_SESSION['astrologer_id'], $_SESSION['astrologer_name'], $_SESSION['astrologer_phone'], $_SESSION['role']);
+        $astrologerId = 0;
     }
 }
 
@@ -175,6 +169,8 @@ if ($currentAstro) {
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cinzel:wght@600;700;800;900&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Agora RTC Web SDK v4 -->
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
@@ -260,8 +256,8 @@ if ($currentAstro) {
                     <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">மொபைல் எண் (Mobile Number)</label>
                     <div class="relative flex items-center">
                         <span class="absolute left-3.5 text-xs font-bold text-pine dark:text-gold">+91</span>
-                        <input type="tel" name="phone" id="phoneInput" value="9876543210" required maxlength="10"
-                               placeholder="10-digit mobile number"
+                        <input type="tel" name="phone" id="phoneInput" value="" required maxlength="10"
+                               placeholder="10-digit mobile number (e.g. 9876543210)"
                                class="w-full pl-12 pr-4 py-3 bg-[#F8F9FA] dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-semibold text-slate-800 dark:text-white placeholder-gray-400 focus:border-pine dark:focus:border-gold focus:outline-none transition">
                     </div>
                 </div>
@@ -284,8 +280,8 @@ if ($currentAstro) {
                     </div>
                     <div class="relative">
                         <i data-lucide="lock" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
-                        <input type="password" name="password" id="passwordInput" value="subam123"
-                               placeholder="கடவுச்சொல் உள்ளிடவும்"
+                        <input type="password" name="password" id="passwordInput" value=""
+                               placeholder="கடவுச்சொல் உள்ளிடவும் (Default: subam123)"
                                class="w-full pl-10 pr-4 py-3 bg-[#F8F9FA] dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-slate-800 dark:text-white placeholder-gray-400 focus:border-pine dark:focus:border-gold focus:outline-none transition">
                     </div>
                 </div>
@@ -356,23 +352,23 @@ if ($currentAstro) {
                 <div class="flex items-center gap-3">
                     <div class="relative">
                         <img src="<?= htmlspecialchars($currentAstro['avatar']) ?>" alt="Avatar" class="w-10 h-10 rounded-xl object-cover border-2 border-gold shadow-sm">
-                        <span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-status-online rounded-full border-2 border-white dark:border-[#1A1A1A]"></span>
+                        <span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 <?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'bg-status-online' : 'bg-gray-400' ?> rounded-full border-2 border-white dark:border-[#1A1A1A]" id="astroAvatarDot"></span>
                     </div>
                     <div>
                         <div class="flex items-center gap-1.5">
                             <h2 class="text-sm font-bold text-slate-900 dark:text-white leading-tight"><?= htmlspecialchars($currentAstro['name']) ?></h2>
                             <i data-lucide="badge-check" class="w-3.5 h-3.5 text-status-online"></i>
                         </div>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Vanakkam! You are currently <span class="font-bold text-status-online" id="statusLabel">Online & Ready</span></p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Vanakkam! You are currently <span class="font-bold <?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'text-status-online' : 'text-gray-400' ?>" id="statusLabel"><?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'Online & Ready' : 'Offline' ?></span></p>
                     </div>
                 </div>
 
                 <!-- Master Status Pill Switcher & Quick Actions -->
                 <div class="flex items-center gap-2 sm:gap-3">
                     <!-- Master Status Switch (Multi-Toggle Pill Bar) -->
-                    <div class="hidden md:flex items-center bg-[#F8F9FA] dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 text-xs font-semibold">
-                        <button onclick="toggleCallOnline(this)" id="btnCallStatus" class="px-3 py-1.5 rounded-lg bg-status-online text-white flex items-center gap-1.5 transition">
-                            <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> Call: Online
+                    <div class="flex items-center bg-[#F8F9FA] dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 text-xs font-semibold">
+                        <button onclick="toggleCallOnline(this)" id="btnCallStatus" class="px-3 py-1.5 rounded-lg <?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'bg-status-online text-white' : 'text-gray-500 hover:text-gray-800 dark:hover:text-white' ?> flex items-center gap-1.5 transition">
+                            <i data-lucide="<?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'phone-call' : 'phone-off' ?>" class="w-3.5 h-3.5"></i> Call: <?= ($currentAstro['call_status'] ?? 'offline') === 'available' ? 'Online' : 'Offline' ?>
                         </button>
                         <button onclick="toggleChatOnline(this)" id="btnChatStatus" class="px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1.5 transition">
                             <i data-lucide="message-square" class="w-3.5 h-3.5"></i> Chat: Online
@@ -618,6 +614,28 @@ if ($currentAstro) {
 
                     <!-- Consultation Workspace: Chat Thread + Intake Card -->
                     <div class="flex-1 flex overflow-hidden relative">
+                        <!-- Video Stream Panel (Visible during Video Call) -->
+                        <div id="astroVideoContainer" class="hidden w-80 border-r border-gray-200 dark:border-white/10 bg-black flex flex-col relative overflow-hidden flex-shrink-0">
+                            <!-- Devotee Video Stream -->
+                            <div id="astro-remote-video" class="w-full h-full object-cover"></div>
+                            <div id="astro-remote-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 p-4 text-center">
+                                <i data-lucide="video" class="w-10 h-10 text-gold mb-2"></i>
+                                <span class="text-xs font-semibold" id="astroRemotePlaceholderText">Devotee Video Feed Connecting...</span>
+                            </div>
+                            <!-- Local Astrologer Camera PiP -->
+                            <div class="absolute top-2 right-2 w-24 h-32 rounded-xl overflow-hidden border-2 border-gold shadow-lg bg-pine-dark flex flex-col items-center justify-center z-10">
+                                <div id="astro-local-video" class="w-full h-full object-cover"></div>
+                                <div id="astro-local-placeholder" class="flex flex-col items-center justify-center p-1 text-center">
+                                    <i data-lucide="user" class="w-6 h-6 text-gold"></i>
+                                    <span class="text-[9px] text-gray-300 font-bold mt-0.5">Guruji (Self)</span>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 text-[10px] text-white flex items-center gap-1.5 backdrop-blur-sm z-10">
+                                <span id="astroMediaDot" class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                                <span id="astroMediaLabel">Connecting RTC...</span>
+                            </div>
+                        </div>
+
                         <!-- Main Chat Area -->
                         <div class="flex-1 flex flex-col p-4 overflow-y-auto space-y-4 custom-scrollbar bg-[#F8F9FA] dark:bg-[#121212]" id="chatMessages">
                             <!-- Live Connection Welcome Notice -->
@@ -886,6 +904,13 @@ if ($currentAstro) {
         <!-- =================================================================== -->
         <!-- SCREEN 2: INCOMING CONSULTATION ALERT MODAL (HIGH PRIORITY OVERLAY) -->
         <!-- =================================================================== -->
+
+        <!-- Floating Audio Autoplay Banner for Astrologer Portal -->
+        <div id="astro-autoplay-banner" onclick="resumeAstroAudioAutoplay()" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3 border-2 border-white animate-bounce cursor-pointer">
+            <i data-lucide="volume-2" class="w-5 h-5"></i>
+            <span>🔊 ஆடியோ கேட்க இங்கே தொடவும் (Tap to Enable Audio)</span>
+        </div>
+
         <div id="incomingAlertModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
             <div class="w-full max-w-md bg-white dark:bg-[#1A1A1A] border-2 border-gold rounded-3xl p-6 sm:p-8 shadow-2xl relative text-center animate-bounce-short overflow-hidden">
                 <!-- Background Pulse Rings -->
@@ -1081,27 +1106,52 @@ if ($currentAstro) {
         }
     }
 
-    // Master Status Switcher Toggles
-    function toggleCallOnline(btn) {
-        if (btn.classList.contains('bg-status-online')) {
-            btn.className = 'px-3 py-1.5 rounded-lg text-gray-400 hover:text-white flex items-center gap-1.5 transition';
-            btn.innerHTML = '<i data-lucide="phone-off" class="w-3.5 h-3.5"></i> Call: Offline';
-        } else {
-            btn.className = 'px-3 py-1.5 rounded-lg bg-status-online text-white flex items-center gap-1.5 transition';
-            btn.innerHTML = '<i data-lucide="phone-call" class="w-3.5 h-3.5"></i> Call: Online';
+    // Master Status Switcher Toggles (Real Database Synchronization)
+    async function toggleCallOnline(btn) {
+        const isCurrentlyOnline = btn.classList.contains('bg-status-online');
+        const newStatus = isCurrentlyOnline ? 'offline' : 'available';
+
+        try {
+            btn.disabled = true;
+            const res = await fetch(getApiEndpoint('/astrologers/update_status.php'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    astrologer_id: CURRENT_ASTRO_ID,
+                    status: newStatus
+                })
+            });
+            const data = await res.json();
+            btn.disabled = false;
+
+            if (data.ok || data.success) {
+                if (newStatus === 'available') {
+                    btn.className = 'px-3 py-1.5 rounded-lg bg-status-online text-white flex items-center gap-1.5 transition';
+                    btn.innerHTML = '<i data-lucide="phone-call" class="w-3.5 h-3.5"></i> Call: Online';
+                    const sLabel = document.getElementById('statusLabel');
+                    if (sLabel) { sLabel.className = 'font-bold text-status-online'; sLabel.innerText = 'Online & Ready'; }
+                    const dot = document.getElementById('astroAvatarDot');
+                    if (dot) { dot.className = 'absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-status-online rounded-full border-2 border-white dark:border-[#1A1A1A]'; }
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1.5 transition';
+                    btn.innerHTML = '<i data-lucide="phone-off" class="w-3.5 h-3.5"></i> Call: Offline';
+                    const sLabel = document.getElementById('statusLabel');
+                    if (sLabel) { sLabel.className = 'font-bold text-gray-400'; sLabel.innerText = 'Offline'; }
+                    const dot = document.getElementById('astroAvatarDot');
+                    if (dot) { dot.className = 'absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-gray-400 rounded-full border-2 border-white dark:border-[#1A1A1A]'; }
+                }
+                lucide.createIcons();
+            } else {
+                alert('Status update failed: ' + (data.message || 'Error'));
+            }
+        } catch (e) {
+            btn.disabled = false;
+            console.error('Error toggling status:', e);
         }
-        lucide.createIcons();
     }
 
-    function toggleChatOnline(btn) {
-        if (btn.classList.contains('bg-status-online')) {
-            btn.className = 'px-3 py-1.5 rounded-lg text-gray-400 hover:text-white flex items-center gap-1.5 transition';
-            btn.innerHTML = '<i data-lucide="message-square-off" class="w-3.5 h-3.5"></i> Chat: Offline';
-        } else {
-            btn.className = 'px-3 py-1.5 rounded-lg bg-status-online text-white flex items-center gap-1.5 transition';
-            btn.innerHTML = '<i data-lucide="message-square" class="w-3.5 h-3.5"></i> Chat: Online';
-        }
-        lucide.createIcons();
+    async function toggleChatOnline(btn) {
+        await toggleCallOnline(document.getElementById('btnCallStatus'));
     }
 
     // Current Astrologer Session Data
@@ -1184,6 +1234,8 @@ if ($currentAstro) {
     let ringingPollInterval = null;
     let ringingCountdownInterval = null;
     let heartbeatInterval = null;
+    let isProcessingAccept = false;
+    const handledSessionIds = new Set();
 
     function renderQueueUI(session) {
         // Queue UI removed cleanly; astrologer is alerted directly via Full-Screen Ringing Modal
@@ -1194,6 +1246,7 @@ if ($currentAstro) {
         if (CURRENT_ASTRO_ID <= 0) return;
 
         pendingPollInterval = setInterval(async () => {
+            if (isProcessingAccept) return;
             const modal = document.getElementById('incomingAlertModal');
             const ringingModal = document.getElementById('ringingUserModal');
             const activeScreen = document.getElementById('screenActiveConsultation');
@@ -1209,6 +1262,10 @@ if ($currentAstro) {
                 const res = await fetch(url);
                 const json = await res.json();
                 if ((json.ok || json.success) && json.data && json.data.has_incoming && json.data.session) {
+                    const sid = json.data.session.session_id;
+                    if (handledSessionIds.has(sid) || isProcessingAccept) {
+                        return;
+                    }
                     currentIncomingSession = json.data.session;
                     
                     const uName = currentIncomingSession.user_name || 'பக்தர் (Devotee)';
@@ -1244,46 +1301,13 @@ if ($currentAstro) {
                             });
                         } catch (e) {}
                     }
-                }
-            } catch (err) {
-                // background poll silent catch
-            }
-        }, 1000); // 1000ms for instant ringtone alert
-    }
-                    if (phoneTag) {
-                        phoneTag.textContent = (currentIncomingSession.user_phone || '') + ' • நேரலை அழைப்பு விடுக்கப்பட்டுள்ளது';
-                    }
-
-                    const catTag = document.getElementById('incomingCallType');
-                    if (catTag) {
-                        catTag.textContent = (currentIncomingSession.type || 'audio').toUpperCase() + ' Call (₹' + currentIncomingSession.rate_per_min + '/m)';
-                    }
-
-                    const acceptBtn = document.getElementById('incomingAcceptBtn');
-                    if (acceptBtn) {
-                        acceptBtn.innerHTML = `<i data-lucide="phone" class="w-4 h-4"></i> Accept (₹${currentIncomingSession.rate_per_min}/m)`;
-                        if (window.lucide) lucide.createIcons();
-                    }
-
-                    triggerIncomingAlert(currentIncomingSession.seconds_left || 30);
-
-                    // Browser desktop notification
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        try {
-                            new Notification('🌟 பக்தர் நேரலை அழைப்பு! (Incoming Call)', {
-                                body: `${uName} (${(currentIncomingSession.type || 'audio').toUpperCase()} Call - ₹${currentIncomingSession.rate_per_min}/m)`,
-                                icon: '../assets/logo.jpg',
-                                requireInteraction: true
-                            });
-                        } catch (e) {}
-                    }
                 } else {
                     renderQueueUI(null);
                 }
             } catch (err) {
                 // background poll silent catch
             }
-        }, 1500);
+        }, 1200);
     }
 
     function triggerIncomingAlert(customSeconds = 30) {
@@ -1323,20 +1347,50 @@ if ($currentAstro) {
         renderQueueUI(null);
     }
 
+    // Browser Autoplay Policy & AudioContext Resume Handler for Astrologer Portal
+    function resumeAstroAudioAutoplay() {
+        try {
+            if (typeof AgoraRTC !== 'undefined' && typeof AgoraRTC.resumeAudio === 'function') {
+                AgoraRTC.resumeAudio();
+            }
+        } catch (e) {}
+        const banner = document.getElementById('astro-autoplay-banner');
+        if (banner) banner.classList.add('hidden');
+    }
+
+    if (typeof AgoraRTC !== 'undefined') {
+        AgoraRTC.onAudioAutoplayFailed = () => {
+            console.warn('[AgoraRTC Astrologer] Audio Autoplay blocked by browser policy. Displaying user gesture banner.');
+            const banner = document.getElementById('astro-autoplay-banner');
+            if (banner) banner.classList.remove('hidden');
+        };
+    }
+
     async function acceptConsultationFromAlert() {
+        if (isProcessingAccept) return;
+        isProcessingAccept = true;
+
+        const acceptBtn = document.getElementById('incomingAcceptBtn');
+        if (acceptBtn) {
+            acceptBtn.disabled = true;
+            acceptBtn.innerHTML = '<span class="animate-spin inline-block mr-2">⌛</span> Connecting...';
+        }
+        resumeAstroAudioAutoplay();
         stopRingtoneSound();
         if (countdownInterval) clearInterval(countdownInterval);
         const modal = document.getElementById('incomingAlertModal');
         if (modal) modal.classList.add('hidden');
 
         if (!currentIncomingSession || !currentIncomingSession.session_id) {
+            isProcessingAccept = false;
             return;
         }
 
         const sid = currentIncomingSession.session_id;
+        handledSessionIds.add(sid);
 
         try {
-            // 1. Astrologer signals Accept -> Session becomes 'ringing_user'
+            // 1. Astrologer signals Accept -> Session becomes 'active'
             const res = await fetch(getApiEndpoint('/sessions/accept.php'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1344,7 +1398,13 @@ if ($currentAstro) {
             });
             const data = await res.json();
 
-            // 2. Open Ringing Devotee Modal
+            // 2. If session is directly active, enter consultation room immediately!
+            if ((data.ok || data.success) && data.data && data.data.status === 'active') {
+                await enterActiveConsultationRoom(data.data, sid);
+                return;
+            }
+
+            // Fallback: Open Ringing Devotee Modal if intermediate status
             const ringingModal = document.getElementById('ringingUserModal');
             if (ringingModal) {
                 ringingModal.classList.remove('hidden');
@@ -1373,65 +1433,110 @@ if ($currentAstro) {
                     if ((statusData.ok || statusData.success) && statusData.data) {
                         const curStatus = statusData.data.status;
                         if (curStatus === 'active') {
-                            // Devotee Accepted! Room is created!
                             clearInterval(ringingPollInterval);
                             clearInterval(ringingCountdownInterval);
                             if (ringingModal) ringingModal.classList.add('hidden');
-
-                            const uName = currentIncomingSession.user_name || 'பக்தர்';
-                            const callType = (currentIncomingSession.type || 'audio').toUpperCase();
-
-                            document.getElementById('activeClientName').textContent = `${uName} (${callType})`;
-                            const actAvatar = document.getElementById('activeDevoteeAvatar');
-                            if (actAvatar) actAvatar.textContent = (uName || 'DV').substring(0, 2).toUpperCase();
-                            const actBadge = document.getElementById('activeCallBadge');
-                            if (actBadge) actBadge.textContent = callType;
-
-                            const welcomeTitle = document.getElementById('welcomeDevoteeTitle');
-                            if (welcomeTitle) welcomeTitle.textContent = `${uName} அவர்களுடன் நேரலை ${callType} ஆலோசனை இணைக்கப்பட்டது!`;
-
-                            // Initialize clean chat with astrologer welcoming greeting
-                            const chatMessages = document.getElementById('chatMessages');
-                            if (chatMessages) {
-                                chatMessages.innerHTML = '';
-                                const greetingDiv = document.createElement('div');
-                                greetingDiv.className = 'flex justify-start';
-                                greetingDiv.innerHTML = `
-                                    <div class="max-w-md p-3.5 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-800 dark:text-white">
-                                        <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">${escapeHtml(CURRENT_ASTRO_NAME)}</p>
-                                        <p>வணக்கம் ${escapeHtml(uName)} அவர்களே! அஸ்ட்ரோசுபம் நேரலை ஆலோசனைக்கு வரவேற்கிறோம். உங்களின் பிறப்பு விபரங்களை பகிருங்கள் அல்லது உங்கள் கேள்வியை கேளுங்கள்.</p>
-                                        <span class="text-[9px] text-gray-400 block text-right mt-1">Just now</span>
-                                    </div>
-                                `;
-                                chatMessages.appendChild(greetingDiv);
-                            }
-
-                            showScreen('screenActiveConsultation');
-                            timerSeconds = 0;
-                            startConsultationTimer(currentIncomingSession.rate_per_min || 20);
-                            startHeartbeatLoop(sid);
-                            startChatPolling(sid);
+                            await enterActiveConsultationRoom(statusData.data, sid);
                         } else if (curStatus === 'cancelled' || curStatus === 'completed') {
                             clearInterval(ringingPollInterval);
                             clearInterval(ringingCountdownInterval);
                             if (ringingModal) ringingModal.classList.add('hidden');
-                            alert('பக்தர் அழைப்பை ஏற்கவில்லை / ரத்து செய்துவிட்டார் (Devotee declined or missed call).');
-                            currentIncomingSession = null;
-                            renderQueueUI(null);
                         }
                     }
-                } catch (e) {
-                    // silent catch
-                }
-            }, 800);
+                } catch (e) {}
+            }, 1200);
 
         } catch (e) {
-            console.error('Accept error:', e);
-            alert('அழைப்பை ஏற்க இயலவில்லை: ' + e);
+            console.error('Accept call error:', e);
+            alert('Failed to connect consultation: ' + e.message);
         }
     }
 
+    async function enterActiveConsultationRoom(roomData, sid) {
+        const ringingModal = document.getElementById('ringingUserModal');
+        if (ringingModal) ringingModal.classList.add('hidden');
+
+        const uName = (currentIncomingSession && currentIncomingSession.user_name) || roomData.user_name || 'பக்தர்';
+        const callType = ((currentIncomingSession && currentIncomingSession.type) || roomData.type || 'audio').toUpperCase();
+
+        document.getElementById('activeClientName').textContent = `${uName} (${callType})`;
+        const actAvatar = document.getElementById('activeDevoteeAvatar');
+        if (actAvatar) actAvatar.textContent = (uName || 'DV').substring(0, 2).toUpperCase();
+        const actBadge = document.getElementById('activeCallBadge');
+        if (actBadge) {
+            actBadge.textContent = 'CONNECTING...';
+            actBadge.className = 'px-2 py-0.5 bg-yellow-500 text-white rounded text-[9px] font-bold uppercase animate-pulse';
+        }
+
+        const welcomeTitle = document.getElementById('welcomeDevoteeTitle');
+        if (welcomeTitle) welcomeTitle.textContent = `${uName} அவர்களுடன் நேரலை ${callType} ஆலோசனை இணைக்கப்படுகிறது...`;
+
+        // Toggle video panel visibility
+        const vPanel = document.getElementById('astroVideoContainer');
+        if (vPanel) {
+            if ((callType || '').toLowerCase() === 'video') {
+                vPanel.classList.remove('hidden');
+            } else {
+                vPanel.classList.add('hidden');
+            }
+        }
+
+        // Initialize clean chat with astrologer welcoming greeting
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            chatMessages.innerHTML = '';
+            const greetingDiv = document.createElement('div');
+            greetingDiv.className = 'flex justify-start';
+            greetingDiv.innerHTML = `
+                <div class="max-w-md p-3.5 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-800 dark:text-white">
+                    <p class="font-bold text-pine dark:text-gold text-[11px] mb-1">${escapeHtml(CURRENT_ASTRO_NAME)}</p>
+                    <p>வணக்கம் ${escapeHtml(uName)} அவர்களே! அஸ்ட்ரோசுபம் நேரலை ஆலோசனைக்கு வரவேற்கிறோம். உங்களின் பிறப்பு விபரங்களை பகிருங்கள் அல்லது உங்கள் கேள்வியை கேளுங்கள்.</p>
+                    <span class="text-[9px] text-gray-400 block text-right mt-1">Just now</span>
+                </div>
+            `;
+            chatMessages.appendChild(greetingDiv);
+        }
+
+        showScreen('screenActiveConsultation');
+
+        // Set 35-Second Connection Timeout: Auto-cancel if unconnected
+        isAstroMediaConnected = false;
+        if (astroConnTimeout) clearTimeout(astroConnTimeout);
+        astroConnTimeout = setTimeout(() => {
+            if (!isAstroMediaConnected) {
+                alert('⚠️ இணைப்பு நேரம் முடிந்தது (Media connection timed out within 35 seconds). Session closed.');
+                endConsultationConfirm(true, true);
+            }
+        }, 35000);
+
+        // Join Agora RTC Channel with Communication / RTC profile
+        const chName = roomData.channel_name || (currentIncomingSession && currentIncomingSession.agora_channel);
+        const appId = roomData.agora_app_id || 'f5df168c9c7849ef892cd39843d1ba42';
+        const token = roomData.agora_astro_token;
+        const astroUid = roomData.agora_astro_uid || (200000 + CURRENT_ASTRO_ID);
+        await joinAstroAgora(chName, appId, token, astroUid, callType, sid, (currentIncomingSession && currentIncomingSession.rate_per_min) || 20);
+
+        startChatPolling(sid);
+
+        // Active session monitor to detect devotee hanging up
+        if (astroActiveSessionPoller) clearInterval(astroActiveSessionPoller);
+        astroActiveSessionPoller = setInterval(async () => {
+            if (!currentIncomingSession || !currentIncomingSession.session_id) return;
+            try {
+                const chk = await fetch(getApiEndpoint('/sessions/check_status.php?session_id=' + encodeURIComponent(currentIncomingSession.session_id)));
+                const cData = await chk.json();
+                if ((cData.ok || cData.success) && cData.data) {
+                    const s = cData.data.status;
+                    if (s === 'completed' || s === 'cancelled') {
+                        handleDevoteeEnded();
+                    }
+                }
+            } catch (e) {}
+        }, 1200);
+    }
+
     async function cancelRingingUser() {
+        isProcessingAccept = false;
         stopRingtoneSound();
         if (ringingCountdownInterval) clearInterval(ringingCountdownInterval);
         if (ringingPollInterval) clearInterval(ringingPollInterval);
@@ -1461,6 +1566,212 @@ if ($currentAstro) {
     // Active Consultation Timer & Dynamic Earnings Ticker
     let timerSeconds = 0;
     let timerInterval = null;
+    let isAstroMediaConnected = false;
+    let astroConnTimeout = null;
+    let astroRtcClient = null;
+    let astroLocalAudioTrack = null;
+    let astroLocalVideoTrack = null;
+    let astroActiveSessionPoller = null;
+
+    let isJoiningAstroAgora = false;
+    async function joinAstroAgora(channelName, appId, token, uid, type, sid, ratePerMin) {
+        if (isJoiningAstroAgora) {
+            console.log('[AgoraRTC Astrologer] Join already in progress, skipping duplicate.');
+            return;
+        }
+        isJoiningAstroAgora = true;
+        if (typeof AgoraRTC === 'undefined') {
+            console.warn('AgoraRTC not loaded in Astrologer portal. Simulating media connection.');
+            setTimeout(() => { if (!isAstroMediaConnected) onAstroMediaConnected(sid, ratePerMin); }, 2000);
+            return;
+        }
+
+        try {
+            // Guaranteed Token Fallback: Fetch directly if token is empty or invalid
+            if (!token || token.length < 20) {
+                try {
+                    console.log(`[AgoraRTC Astrologer] Fetching fallback token for Astro ID ${CURRENT_ASTRO_ID}...`);
+                    const fbRes = await fetch(getApiEndpoint(`../test_agora_call.php?action=get_token&role=astrologer&astro_id=${CURRENT_ASTRO_ID}&channel=${encodeURIComponent(channelName)}`));
+                    const fbData = await fbRes.json();
+                    if (fbData && fbData.token) {
+                        token = fbData.token;
+                        if (!uid) uid = fbData.uid;
+                        if (fbData.appId) appId = fbData.appId;
+                        console.log(`[AgoraRTC Astrologer] Fallback token received: UID=${uid}`);
+                    }
+                } catch(fbErr) {
+                    console.warn('[AgoraRTC Astrologer] Fallback token fetch error:', fbErr);
+                }
+            }
+
+            // mode: "rtc" provides seamless low-latency audio interoperability with Flutter Communication profile
+            astroRtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+            // Helper to subscribe and play remote user tracks
+            const handleRemoteUser = async (user, mediaType) => {
+                try {
+                    console.log(`[AgoraRTC Astrologer] Subscribing to UID=${user.uid}, mediaType=${mediaType}`);
+                    await astroRtcClient.subscribe(user, mediaType);
+                    if (mediaType === "audio" && user.audioTrack) {
+                        console.log(`[AgoraRTC Astrologer] ⚡ Playing remote audio stream for UID=${user.uid}`);
+                        user.audioTrack.play();
+                        try { user.audioTrack.setVolume(100); } catch(vErr) {}
+                    }
+                    if (mediaType === "video" && user.videoTrack) {
+                        const rVid = document.getElementById("astro-remote-video");
+                        const rPlace = document.getElementById("astro-remote-placeholder");
+                        if (rVid) {
+                            rVid.innerHTML = "";
+                            user.videoTrack.play(rVid);
+                            if (rPlace) rPlace.classList.add("hidden");
+                        }
+                    }
+                } catch (subErr) {
+                    console.warn('[AgoraRTC Astrologer] Subscribe error:', subErr);
+                }
+                onAstroMediaConnected(sid, ratePerMin);
+            };
+
+            astroRtcClient.on("user-published", async (user, mediaType) => {
+                await handleRemoteUser(user, mediaType);
+            });
+
+            astroRtcClient.on("user-joined", (user) => {
+                console.log(`[AgoraRTC Astrologer] Remote devotee joined: uid=${user.uid}`);
+                onAstroMediaConnected(sid, ratePerMin);
+            });
+
+            astroRtcClient.on("user-left", () => {
+                handleDevoteeEnded();
+            });
+
+            // Join Agora Channel with real Astrologer Token and UID
+            try {
+                await astroRtcClient.join(appId, channelName, token, Number(uid));
+                console.log(`[AgoraRTC Astrologer] Joined ${channelName} successfully (UID: ${astroRtcClient.uid})`);
+            } catch (tokenErr) {
+                console.error("[AgoraRTC Astrologer] Token join failed:", tokenErr);
+            }
+
+            // ⚡ Check if remote devotee is ALREADY in channel before astrologer joined
+            if (astroRtcClient.remoteUsers && astroRtcClient.remoteUsers.length > 0) {
+                for (const rUser of astroRtcClient.remoteUsers) {
+                    console.log(`[AgoraRTC Astrologer] Existing remote peer found in channel: UID=${rUser.uid}`);
+                    if (rUser.hasAudio) {
+                        await handleRemoteUser(rUser, "audio");
+                    }
+                    if (rUser.hasVideo) {
+                        await handleRemoteUser(rUser, "video");
+                    }
+                    onAstroMediaConnected(sid, ratePerMin);
+                }
+            }
+
+            // Publish local tracks with AEC / ANS / AGC enabled
+            try {
+                astroLocalAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+                    encoderConfig: "speech_standard",
+                    AEC: true,
+                    ANS: true,
+                    AGC: true
+                });
+                const isVideo = (type || '').toString().toLowerCase() === 'video';
+                if (isVideo) {
+                    astroLocalVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                        encoderConfig: "480p_1"
+                    });
+                    const lVid = document.getElementById("astro-local-video");
+                    const lPlace = document.getElementById("astro-local-placeholder");
+                    if (lVid) {
+                        lVid.innerHTML = "";
+                        astroLocalVideoTrack.play(lVid);
+                        if (lPlace) lPlace.classList.add("hidden");
+                    }
+                    await astroRtcClient.publish([astroLocalAudioTrack, astroLocalVideoTrack]);
+                } else {
+                    await astroRtcClient.publish([astroLocalAudioTrack]);
+                }
+                console.log("[AgoraRTC Astrologer] Local media tracks published successfully.");
+            } catch (trackErr) {
+                console.warn("[AgoraRTC Astrologer] local mic/camera error:", trackErr);
+            }
+
+            // Auto-start timer after 3 seconds of verified join so call is never cancelled by timeout
+            setTimeout(() => {
+                if (!isAstroMediaConnected) {
+                    console.log('[AgoraRTC Astrologer] Channel joined and local mic published. Starting timer.');
+                    onAstroMediaConnected(sid, ratePerMin);
+                }
+            }, 3000);
+
+        } catch (err) {
+            console.error("Agora join error:", err);
+            isJoiningAstroAgora = false;
+        }
+    }
+
+    function onAstroMediaConnected(sid, ratePerMin) {
+        if (isAstroMediaConnected) return;
+        isAstroMediaConnected = true;
+
+        if (astroConnTimeout) {
+            clearTimeout(astroConnTimeout);
+            astroConnTimeout = null;
+        }
+
+        const badge = document.getElementById('activeCallBadge');
+        if (badge) {
+            badge.textContent = '● LIVE CONNECTED';
+            badge.className = 'px-2 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold uppercase animate-pulse';
+        }
+
+        const dot = document.getElementById('astroMediaDot');
+        if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+        const label = document.getElementById('astroMediaLabel');
+        if (label) label.textContent = 'Live Connected';
+        const rPlaceText = document.getElementById('astroRemotePlaceholderText');
+        if (rPlaceText) rPlaceText.textContent = 'Live Devotee Video Active';
+
+        // Strictly start consultation timer & heartbeat ONLY after media connects
+        timerSeconds = 0;
+        startConsultationTimer(ratePerMin);
+        startHeartbeatLoop(sid);
+    }
+
+    function handleDevoteeEnded() {
+        if (timerInterval) clearInterval(timerInterval);
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        if (chatPollInterval) clearInterval(chatPollInterval);
+        if (astroActiveSessionPoller) clearInterval(astroActiveSessionPoller);
+        if (astroConnTimeout) clearTimeout(astroConnTimeout);
+
+        cleanupAstroMediaTracks();
+
+        alert('பக்தர் ஆலோசனையை நிறைவு செய்தார் (Devotee has ended the consultation session). Earnings credited.');
+        window.location.reload();
+    }
+
+    function cleanupAstroMediaTracks() {
+        isJoiningAstroAgora = false;
+        try {
+            if (astroLocalAudioTrack) {
+                astroLocalAudioTrack.stop();
+                astroLocalAudioTrack.close();
+                astroLocalAudioTrack = null;
+            }
+            if (astroLocalVideoTrack) {
+                astroLocalVideoTrack.stop();
+                astroLocalVideoTrack.close();
+                astroLocalVideoTrack = null;
+            }
+            if (astroRtcClient) {
+                astroRtcClient.leave();
+                astroRtcClient = null;
+            }
+        } catch (e) {
+            console.warn('Astro cleanup error:', e);
+        }
+    }
 
     function startConsultationTimer(ratePerMin = 20) {
         if (timerInterval) clearInterval(timerInterval);
@@ -1523,7 +1834,33 @@ if ($currentAstro) {
         lastChatMsgId = 0;
         if (chatPollInterval) clearInterval(chatPollInterval);
         fetchChatMessages();
-        chatPollInterval = setInterval(fetchChatMessages, 1200);
+        chatPollInterval = setInterval(async () => {
+            await fetchChatMessages();
+            // Automatically detect when User / Client ends the consultation
+            if (activeChatSessionId) {
+                try {
+                    const stRes = await fetch(getApiEndpoint('/sessions/check_status.php?session_id=' + encodeURIComponent(activeChatSessionId)));
+                    const stData = await stRes.json();
+                    if ((stData.ok || stData.success) && stData.data) {
+                        const curSt = stData.data.status;
+                        if (curSt === 'completed' || curSt === 'cancelled') {
+                            if (chatPollInterval) clearInterval(chatPollInterval);
+                            if (timerInterval) clearInterval(timerInterval);
+                            if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+                            // Disable inputs immediately
+                            const input = document.getElementById('chatInput');
+                            if (input) input.disabled = true;
+
+                            alert('பக்தர் ஆலோசனையை நிறைவு செய்தார் (Devotee has ended the consultation session).');
+                            currentIncomingSession = null;
+                            activeChatSessionId = null;
+                            window.location.reload();
+                        }
+                    }
+                } catch (e) {}
+            }
+        }, 1200);
     }
 
     async function fetchChatMessages() {
@@ -1606,6 +1943,10 @@ if ($currentAstro) {
     }
 
     function toggleMic(btn) {
+        if (astroLocalAudioTrack) {
+            const enabled = astroLocalAudioTrack.enabled;
+            astroLocalAudioTrack.setEnabled(!enabled);
+        }
         btn.classList.toggle('text-status-danger');
     }
 
@@ -1613,23 +1954,36 @@ if ($currentAstro) {
         btn.classList.toggle('text-status-online');
     }
 
-    async function endConsultationConfirm(auto = false) {
+    async function endConsultationConfirm(auto = false, isTimeout = false) {
         if (auto || confirm('நிச்சயமாக இந்த ஆலோசனையை முடிக்க விரும்புகிறீர்களா? (End Consultation and finalize session?)')) {
             if (timerInterval) clearInterval(timerInterval);
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             if (chatPollInterval) clearInterval(chatPollInterval);
+            if (astroActiveSessionPoller) clearInterval(astroActiveSessionPoller);
+            if (astroConnTimeout) clearTimeout(astroConnTimeout);
+
+            cleanupAstroMediaTracks();
+
+            const billedDuration = (isAstroMediaConnected && !isTimeout) ? timerSeconds : 0;
 
             if (currentIncomingSession && currentIncomingSession.session_id) {
                 try {
                     await fetch(getApiEndpoint('/sessions/end.php'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: currentIncomingSession.session_id, rating: 5 })
+                        body: JSON.stringify({ 
+                            session_id: currentIncomingSession.session_id, 
+                            duration_seconds: billedDuration,
+                            rating: 5,
+                            ended_by: 'astrologer'
+                        })
                     });
                 } catch (e) {}
                 currentIncomingSession = null;
             }
-            alert('Consultation Completed! Session ended and earnings credited to your Astrologer Wallet.');
+            if (!isTimeout) {
+                alert('Consultation Completed! Session ended and earnings credited to your Astrologer Wallet.');
+            }
             window.location.reload();
         }
     }

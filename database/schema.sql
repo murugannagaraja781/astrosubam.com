@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `astrologers` (
     `audio_rate_min` DECIMAL(8, 2) DEFAULT 15.00,
     `video_rate_min` DECIMAL(8, 2) DEFAULT 25.00,
     `chat_rate_min` DECIMAL(8, 2) DEFAULT 10.00,
-    `call_status` ENUM('available', 'busy', 'offline') DEFAULT 'available',
+    `call_status` ENUM('available', 'busy', 'offline') DEFAULT 'offline',
     `rating` DECIMAL(3, 2) DEFAULT 4.90,
     `total_reviews` INT DEFAULT 128,
     `status` ENUM('pending', 'approved', 'suspended') DEFAULT 'approved',

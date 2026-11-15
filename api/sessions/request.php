@@ -11,7 +11,11 @@ $user = JWT::getAuthUser();
 
 $userId = (int)($input['user_id'] ?? ($user['user_id'] ?? 0));
 $astrologerId = (int)($input['astrologer_id'] ?? 1);
-$type = in_array($input['type'] ?? '', ['audio', 'video', 'chat']) ? $input['type'] : 'audio';
+$rawType = strtolower(trim((string)($input['type'] ?? '')));
+if ($rawType === 'call' || $rawType === 'voice') {
+    $rawType = 'audio';
+}
+$type = in_array($rawType, ['audio', 'video', 'chat'], true) ? $rawType : 'audio';
 $userName = trim($input['user_name'] ?? '');
 $userPhone = trim($input['user_phone'] ?? '');
 
@@ -117,26 +121,76 @@ if ($driver === 'sqlite') {
     ) ENGINE=InnoDB");
 }
 
-// Cancel any stale requested session older than 45s for this user or astrologer
+// 1. Deduplication guard FIRST: Check if active or requested session already exists within last 30 seconds
 try {
-    if ($driver === 'sqlite') {
-        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
-                      WHERE (user_id = ? OR astrologer_id = ?) 
-                        AND status IN ('requested', 'ringing_user') 
-                        AND created_at < datetime('now', '-45 seconds')")->execute([$userId, $astrologerId]);
-    } else {
-        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
-                      WHERE (user_id = ? OR astrologer_id = ?) 
-                        AND status IN ('requested', 'ringing_user') 
-                        AND created_at < DATE_SUB(NOW(), INTERVAL 45 SECOND)")->execute([$userId, $astrologerId]);
+    $existingStmt = $db->prepare("SELECT * FROM consultation_sessions 
+                                  WHERE user_id = ? AND astrologer_id = ? AND status IN ('requested', 'ringing_user', 'active') 
+                                  ORDER BY id DESC LIMIT 1");
+    $existingStmt->execute([$userId, $astrologerId]);
+    $existing = $existingStmt->fetch();
+    if ($existing) {
+        $createdAtStr = (string)($existing['created_at'] ?? '');
+        $createdTs = !empty($createdAtStr) ? strtotime($createdAtStr) : time();
+        $age = time() - $createdTs;
+        // If created within last 30 seconds, return the existing session! Do NOT duplicate!
+        if ($age < 30) {
+            require_once __DIR__ . '/../../helpers/AgoraToken.php';
+            $uToken = !empty($existing['agora_user_token']) ? $existing['agora_user_token'] : AgoraToken::generateUserToken($existing['agora_channel'], $userId);
+            $aToken = !empty($existing['agora_astro_token']) ? $existing['agora_astro_token'] : AgoraToken::generateAstroToken($existing['agora_channel'], $astrologerId);
+            $userUid = AgoraToken::getUserUid($userId);
+            $astroUid = AgoraToken::getAstroUid($astrologerId);
+
+            Response::json(true, "Consultation request placed! Ringing astrologer...", [
+                'session_id'          => $existing['session_id'],
+                'channel_name'        => $existing['agora_channel'],
+                'status'              => $existing['status'],
+                'type'                => $existing['type'],
+                'rate_per_min'        => (float)$existing['rate_per_min'],
+                'user_id'             => $userId,
+                'user_name'           => $userName,
+                'user_phone'          => $userPhone,
+                'astrologer_id'       => $astrologerId,
+                'astrologer_name'     => $astro['name'],
+                'agora_user_token'    => $uToken,
+                'agora_astro_token'   => $aToken,
+                'agora_user_uid'      => $userUid,
+                'agora_astro_uid'     => $astroUid,
+                'timeout_seconds'     => max(1, 30 - $age)
+            ], 200);
+            exit;
+        }
     }
 } catch (\Throwable $t) {}
 
-$nowUtc = gmdate('Y-m-d H:i:s');
-$ins = $db->prepare("INSERT INTO consultation_sessions 
-    (session_id, user_id, astrologer_id, type, status, agora_channel, rate_per_min, created_at) 
-    VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)");
-$ins->execute([$sessionId, $userId, $astrologerId, $type, $channelName, $rate, $nowUtc]);
+// 2. Cancel only truly STALE requested sessions (older than 40 seconds)
+try {
+    if ($driver === 'sqlite') {
+        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
+                      WHERE user_id = ? AND status = 'requested' AND created_at < datetime('now', '-40 seconds')")->execute([$userId]);
+    } else {
+        $db->prepare("UPDATE consultation_sessions SET status = 'cancelled' 
+                      WHERE user_id = ? AND status = 'requested' AND created_at < NOW() - INTERVAL 40 SECOND")->execute([$userId]);
+    }
+} catch (\Throwable $t) {}
+
+require_once __DIR__ . '/../../helpers/AgoraToken.php';
+
+$userToken = AgoraToken::generateUserToken($channelName, $userId);
+$astroToken = AgoraToken::generateAstroToken($channelName, $astrologerId);
+$userUid = AgoraToken::getUserUid($userId);
+$astroUid = AgoraToken::getAstroUid($astrologerId);
+
+if ($driver === 'sqlite') {
+    $ins = $db->prepare("INSERT INTO consultation_sessions 
+        (session_id, user_id, astrologer_id, type, status, agora_channel, agora_user_token, agora_astro_token, rate_per_min, created_at) 
+        VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, datetime('now'))");
+    $ins->execute([$sessionId, $userId, $astrologerId, $type, $channelName, $userToken, $astroToken, $rate]);
+} else {
+    $ins = $db->prepare("INSERT INTO consultation_sessions 
+        (session_id, user_id, astrologer_id, type, status, agora_channel, agora_user_token, agora_astro_token, rate_per_min, created_at) 
+        VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, NOW())");
+    $ins->execute([$sessionId, $userId, $astrologerId, $type, $channelName, $userToken, $astroToken, $rate]);
+}
 
 Response::json(true, "Consultation request placed! Ringing astrologer...", [
     'session_id'          => $sessionId,
@@ -149,6 +203,10 @@ Response::json(true, "Consultation request placed! Ringing astrologer...", [
     'user_phone'          => $userPhone,
     'astrologer_id'       => $astrologerId,
     'astrologer_name'     => $astro['name'],
+    'agora_user_token'    => $userToken,
+    'agora_astro_token'   => $astroToken,
+    'agora_user_uid'      => $userUid,
+    'agora_astro_uid'     => $astroUid,
     'timeout_seconds'     => 30
 ], 201);
 

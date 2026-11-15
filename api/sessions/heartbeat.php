@@ -71,6 +71,13 @@ try {
                   WHERE id = ?")
        ->execute([$newDuration, $newTotalDeducted, $astroShare, $session['id']]);
 
+    // Credit Astrologer with 1-min share (80%)
+    $minuteShare = round($rate * 0.80, 2);
+    try {
+        $db->prepare("UPDATE astrologers SET wallet_balance = COALESCE(wallet_balance, 0) + ? WHERE id = ?")
+           ->execute([$minuteShare, $session['astrologer_id']]);
+    } catch (\Throwable $t) {}
+
     $db->commit();
 
     $remainingMinutes = floor($newBalance / $rate);

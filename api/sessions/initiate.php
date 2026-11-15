@@ -11,7 +11,11 @@ $input = Response::getJsonInput();
 
 $userId = $user['user_id'] ?? (int)($input['user_id'] ?? 0);
 $astrologerId = (int)($input['astrologer_id'] ?? 0);
-$type = in_array($input['type'] ?? '', ['audio', 'video', 'chat']) ? $input['type'] : 'audio';
+$rawType = strtolower(trim((string)($input['type'] ?? '')));
+if ($rawType === 'call' || $rawType === 'voice') {
+    $rawType = 'audio';
+}
+$type = in_array($rawType, ['audio', 'video', 'chat'], true) ? $rawType : 'audio';
 
 if ($userId <= 0 || $astrologerId <= 0) {
     Response::json(false, 'User ID and Astrologer ID are required.', null, 400);

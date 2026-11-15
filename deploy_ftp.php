@@ -80,8 +80,8 @@ function uploadFileWithRetry(&$conn, string $localFile, string $remoteFile, $ftp
     $dir = dirname($remoteFile);
     ensureRemoteDir($conn, $dir, $ftpHost, $ftpPort, $ftpUser, $ftpPass);
 
-    // Skip re-uploading large binaries (like APK) if remote file already matches size
-    if (filesize($localFile) > 5 * 1024 * 1024) {
+    // Skip re-uploading large binaries (like APK) if remote file exists with identical size
+    if (!isset($_SERVER['FORCE_APK']) && filesize($localFile) > 5 * 1024 * 1024) {
         $remoteSize = @ftp_size($conn, $remoteFile);
         if ($remoteSize === filesize($localFile)) {
             echo "  ✔ Already up-to-date (skipped large file): {$remoteFile}\n";

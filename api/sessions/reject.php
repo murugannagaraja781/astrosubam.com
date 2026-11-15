@@ -21,7 +21,15 @@ if (!$session) {
     Response::json(false, 'Session not found.', null, 404);
 }
 
-if ($session['status'] === 'requested' || $session['status'] === 'ringing_user' || $session['status'] === 'active') {
+if ($session['status'] === 'active' || $session['status'] === 'completed') {
+    Response::json(true, 'Session is already active or completed.', [
+        'session_id' => $sessionId,
+        'status'     => $session['status']
+    ]);
+    exit;
+}
+
+if ($session['status'] === 'requested' || $session['status'] === 'ringing_user') {
     $db->prepare("UPDATE consultation_sessions SET status = 'cancelled', end_time = CURRENT_TIMESTAMP WHERE id = ?")->execute([$session['id']]);
     $db->prepare("UPDATE astrologers SET call_status = 'available' WHERE id = ?")->execute([$session['astrologer_id']]);
 }

@@ -46,6 +46,9 @@ if ($dash['ok'] ?? false) {
     $allPassed = false;
 }
 
+// Ensure Astrologer 1 is online for consultation test
+runApi('POST', '/astrologers/update_status.php', ['astrologer_id' => 1, 'status' => 'available']);
+
 // 2. Consultation Creation
 $req = runApi('POST', '/sessions/request.php', [
     'user_id' => 2,
@@ -100,6 +103,9 @@ if ($sid) {
         $allPassed = false;
     }
 }
+
+// Reset Astrologer 1 back to offline after test
+runApi('POST', '/astrologers/update_status.php', ['astrologer_id' => 1, 'status' => 'offline']);
 
 echo "\n--------------------------------------------------------\n";
 if ($allPassed) {

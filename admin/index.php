@@ -973,12 +973,12 @@ $activeTab = $_GET['tab'] ?? 'overview';
                             <div class="space-y-3 text-xs">
                                 <div>
                                     <label class="block text-white/70 mb-1">AGORA_APP_ID (32-character Hexadecimal ID)</label>
-                                    <input type="text" name="AGORA_APP_ID" value="<?= htmlspecialchars($envVars['AGORA_APP_ID'] ?? '8c0ca8c1b8bc403d814f8f86653e07c3') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                    <input type="text" name="AGORA_APP_ID" value="<?= htmlspecialchars($envVars['AGORA_APP_ID'] ?? 'f5df168c9c7849ef892cd39843d1ba42') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:border-astro-gold focus:outline-none">
                                 </div>
                                 <div>
                                     <label class="block text-white/70 mb-1">AGORA_APP_CERTIFICATE (Primary Certificate for RTC Tokens)</label>
                                     <div class="relative">
-                                        <input type="password" id="input_agora_cert" name="AGORA_APP_CERTIFICATE" value="<?= htmlspecialchars($envVars['AGORA_APP_CERTIFICATE'] ?? 'f42df2eb1af44ac0a3394ab2af3dd5ed') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 pr-10 text-white font-mono focus:border-astro-gold focus:outline-none">
+                                        <input type="password" id="input_agora_cert" name="AGORA_APP_CERTIFICATE" value="<?= htmlspecialchars($envVars['AGORA_APP_CERTIFICATE'] ?? 'e9c2271eafed47d686d609f90feaaf8b') ?>" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 pr-10 text-white font-mono focus:border-astro-gold focus:outline-none">
                                         <button type="button" onclick="togglePass('input_agora_cert')" class="absolute right-3 top-2.5 text-white/40 hover:text-white">
                                             <i data-lucide="eye" class="w-4 h-4"></i>
                                         </button>

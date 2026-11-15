@@ -17,3 +17,6 @@ Thumbs.db
 *.log
 .kotlin/
 *.salive
+flutter_app/android/build/
+flutter_app/build/
+build/

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/Response.php';
 require_once __DIR__ . '/../../helpers/AgoraToken.php';
+require_once __DIR__ . '/../../helpers/Settings.php';
 
 $input = Response::getJsonInput();
 $sessionId = trim($input['session_id'] ?? ($_GET['session_id'] ?? ''));
@@ -34,11 +35,14 @@ $channelName = $session['agora_channel'];
 $userId = $userId > 0 ? $userId : (int)$session['user_id'];
 $astrologerId = (int)$session['astrologer_id'];
 
-// Generate Agora RTC Token for Devotee
-$userToken = AgoraToken::generateRtcToken($channelName, $userId);
+$userUid = AgoraToken::getUserUid($userId);
+$astroUid = AgoraToken::getAstroUid($astrologerId);
 
-// Generate Astrologer Token if not exists
-$astroToken = !empty($session['agora_astro_token']) ? $session['agora_astro_token'] : AgoraToken::generateRtcToken($channelName, $astrologerId);
+// Generate Agora RTC Token for Devotee with unique userUid
+$userToken = AgoraToken::generateUserToken($channelName, $userId);
+
+// Generate Astrologer Token if not exists with unique astroUid
+$astroToken = !empty($session['agora_astro_token']) ? $session['agora_astro_token'] : AgoraToken::generateAstroToken($channelName, $astrologerId);
 
 // Mark session ACTIVE and record connection start time!
 $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -63,8 +67,11 @@ Response::json(true, 'Devotee accepted call! Room connected successfully.', [
     'session_id'        => $sessionId,
     'status'            => 'active',
     'channel_name'      => $channelName,
+    'agora_app_id'      => Settings::get('agora_app_id', 'f5df168c9c7849ef892cd39843d1ba42'),
     'agora_user_token'  => $userToken,
     'agora_astro_token' => $astroToken,
+    'agora_user_uid'    => $userUid,
+    'agora_astro_uid'   => $astroUid,
     'type'              => $session['type'],
     'rate_per_min'      => (float)$session['rate_per_min'],
     'user_id'           => $userId,

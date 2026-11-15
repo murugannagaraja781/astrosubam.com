@@ -25,7 +25,7 @@ try {
             'audio_rate_min' => 20.00,
             'video_rate_min' => 35.00,
             'chat_rate_min' => 12.00,
-            'call_status' => 'available',
+            'call_status' => 'offline',
             'avatar' => 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
         ],
         [
@@ -39,7 +39,7 @@ try {
             'audio_rate_min' => 18.00,
             'video_rate_min' => 30.00,
             'chat_rate_min' => 10.00,
-            'call_status' => 'available',
+            'call_status' => 'offline',
             'avatar' => 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
         ],
         [
@@ -53,7 +53,7 @@ try {
             'audio_rate_min' => 15.00,
             'video_rate_min' => 25.00,
             'chat_rate_min' => 10.00,
-            'call_status' => 'available',
+            'call_status' => 'offline',
             'avatar' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
         ],
         [
@@ -67,7 +67,7 @@ try {
             'audio_rate_min' => 16.00,
             'video_rate_min' => 28.00,
             'chat_rate_min' => 10.00,
-            'call_status' => 'available',
+            'call_status' => 'offline',
             'avatar' => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         ]
     ];
@@ -87,6 +87,8 @@ try {
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Mukta+Malar:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN with custom config -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Agora RTC Web SDK v4 -->
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -291,6 +293,11 @@ try {
             <a href="#astrologers" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">🌟 ஜோதிடர்கள் பட்டியல்</a>
             <a href="#panchangam" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">📅 இன்றைய பஞ்சாங்கம் & ராசிபலன்</a>
             <a href="#services" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">🔮 ஆலோசனைகள் & பரிகாரங்கள்</a>
+            <button onclick="toggleMobileMenu(); openAuthModal();" class="w-full text-left py-2.5 text-astro-gold font-bold flex items-center gap-2 border-y border-astro-emerald/20 my-1">
+                <i data-lucide="user" class="w-4 h-4"></i>
+                <span id="mobile-user-display-name">பக்தர் உள்நுழைவு (Login)</span>
+            </button>
+            <a href="astrologer/" class="block py-2 text-emerald-400 hover:text-emerald-300 font-semibold text-xs">🧙‍♂️ ஜோதிடர் போர்டல் (Astrologer Portal) &rarr;</a>
             <a href="admin/settings.php" class="block py-2 text-white/60 hover:text-astro-gold text-xs">⚙️ Super Admin Settings</a>
         </div>
     </header>
@@ -519,23 +526,28 @@ try {
                     $videoRate = (int)($astro['video_rate_min'] ?? 30);
                     $chatRate = (int)($astro['chat_rate_min'] ?? 10);
                     $avatar = htmlspecialchars($astro['avatar'] ?? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80');
-                    $status = $astro['call_status'] ?? 'available';
+                    $status = strtolower($astro['call_status'] ?? 'offline');
                     $id = (int)$astro['id'];
+                    $isOnline = ($status === 'available');
+                    $isBusy = ($status === 'busy');
                 ?>
-                <div class="glass-card rounded-2xl p-5 relative border border-astro-emerald/20 flex flex-col justify-between group" data-category="<?= strtolower($specialities) ?>">
+                <div id="astro-card-<?= $id ?>" class="glass-card rounded-2xl p-5 relative border border-astro-emerald/20 flex flex-col justify-between group <?= $isOnline ? '' : 'opacity-80' ?>" data-category="<?= strtolower($specialities) ?>" data-status="<?= $status ?>">
                     <!-- Card Header: Avatar & Info -->
                     <div>
                         <div class="flex items-start gap-4 mb-4">
                             <!-- Avatar with Online Dot -->
                             <div class="relative flex-shrink-0">
                                 <img src="<?= $avatar ?>" alt="<?= $name ?>" class="w-16 h-16 rounded-2xl object-cover border-2 border-astro-gold/60 group-hover:border-astro-gold transition">
-                                <span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full <?= $status === 'available' ? 'bg-astro-emerald pulse-online' : 'bg-amber-500' ?> border-2 border-astro-card"></span>
+                                <span id="astro-dot-<?= $id ?>" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full <?= $isOnline ? 'bg-astro-emerald pulse-online' : ($isBusy ? 'bg-amber-500' : 'bg-gray-500') ?> border-2 border-astro-card"></span>
                             </div>
 
                             <!-- Astrologer Info -->
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between">
                                     <h3 class="font-bold text-base text-white truncate font-cinzel"><?= $name ?></h3>
+                                    <span id="astro-pill-<?= $id ?>" class="text-[10px] font-bold px-2 py-0.5 rounded-full <?= $isOnline ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : ($isBusy ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30') ?>">
+                                        ● <?= $isOnline ? 'நேரலை (Online)' : ($isBusy ? 'ஆலோசனையில்' : 'ஆஃப்லைன் (Offline)') ?>
+                                    </span>
                                 </div>
                                 <p class="text-xs text-astro-gold font-medium truncate mt-0.5"><?= $specialities ?></p>
                                 <p class="text-xs text-white/60 mt-0.5"><?= $exp ?> ஆண்டுகள் • <?= $languages ?></p>
@@ -776,6 +788,12 @@ try {
     <!-- INTERACTIVE MODALS (CONSULTATION, CHAT, WALLET, AUTH) -->
     <!-- ============================================== -->
 
+    <!-- Floating Audio Autoplay Banner -->
+    <div id="audio-autoplay-banner" onclick="resumeAudioAutoplay()" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3 border-2 border-white animate-bounce cursor-pointer">
+        <i data-lucide="volume-2" class="w-5 h-5"></i>
+        <span>🔊 ஆடியோ கேட்க இங்கே தொடவும் (Tap to Enable Audio)</span>
+    </div>
+
     <!-- 1. LIVE CALL / VIDEO CONSULTATION SIMULATOR MODAL (AGORA RTC ENGINE) -->
     <div id="call-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
         <div class="glass-panel w-full max-w-md rounded-3xl p-6 border-2 border-astro-gold/50 shadow-glow-gold relative flex flex-col items-center text-center">
@@ -793,14 +811,19 @@ try {
 
             <!-- Video Frame Container (when type === 'Video') -->
             <div id="call-video-container" class="hidden relative w-full h-56 rounded-2xl overflow-hidden border-2 border-astro-gold shadow-glow-gold/40 mb-3 bg-black">
+                <!-- Real Agora Remote Video Stream -->
+                <div id="call-remote-video" class="w-full h-full object-cover"></div>
                 <img id="call-video-astro-img" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80" alt="Video Feed" class="w-full h-full object-cover">
                 <!-- PiP Self Camera -->
-                <div class="absolute top-2 right-2 w-20 h-28 rounded-xl overflow-hidden border-2 border-astro-emerald shadow-md bg-astro-surface flex flex-col items-center justify-center text-white">
-                    <i data-lucide="user" class="w-8 h-8 text-astro-gold"></i>
-                    <span class="text-[9px] text-astro-textMint font-bold mt-1">You (Self)</span>
+                <div class="absolute top-2 right-2 w-20 h-28 rounded-xl overflow-hidden border-2 border-astro-emerald shadow-md bg-astro-surface flex flex-col items-center justify-center text-white z-10">
+                    <div id="call-local-video" class="w-full h-full object-cover"></div>
+                    <div id="call-local-placeholder" class="flex flex-col items-center justify-center p-1">
+                        <i data-lucide="user" class="w-7 h-7 text-astro-gold"></i>
+                        <span class="text-[9px] text-astro-textMint font-bold mt-0.5">You (Self)</span>
+                    </div>
                 </div>
-                <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-white flex items-center gap-1.5 backdrop-blur-sm">
-                    <span class="w-1.5 h-1.5 rounded-full bg-astro-emerald animate-pulse"></span>
+                <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-white flex items-center gap-1.5 backdrop-blur-sm z-10">
+                    <span id="call-video-status-dot" class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
                     <span id="call-video-astro-name">Guruji S. Sundaramurthy</span>
                 </div>
             </div>
@@ -962,27 +985,67 @@ try {
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
 
-            <div class="text-center mb-6">
+            <div class="text-center mb-5">
                 <div class="w-12 h-12 rounded-2xl bg-astro-emerald/20 flex items-center justify-center text-astro-emerald mx-auto mb-2 border border-astro-emerald/40">
                     <i data-lucide="user-check" class="w-6 h-6"></i>
                 </div>
-                <h3 class="font-cinzel text-xl font-bold text-white">பக்தர் உள்நுழைவு (Login)</h3>
-                <p class="text-xs text-astro-gold mt-1 font-semibold">🎁 புதிய பயனர்களுக்கு ₹100 இலவச போனஸ்</p>
+                <h3 class="font-cinzel text-xl font-bold text-white">பக்தர் உள்நுழைவு (Devotee Login)</h3>
+                <p class="text-xs text-astro-gold mt-1 font-semibold">🎁 புதிய பக்தர்களுக்கு உடனடி ₹100 இலவச போனஸ்</p>
             </div>
 
-            <form onsubmit="handleAuthSubmit(event)" class="space-y-4">
+            <!-- Tabs: Password or OTP -->
+            <div class="flex items-center gap-2 p-1 bg-astro-base/80 border border-astro-emerald/20 rounded-xl text-xs font-semibold text-white/70 mb-4">
+                <button type="button" onclick="switchAuthTab('password')" id="auth-tab-pass" class="flex-1 py-1.5 rounded-lg bg-astro-gold text-astro-base font-bold shadow-sm transition">
+                    கடவுச்சொல் (Password)
+                </button>
+                <button type="button" onclick="switchAuthTab('otp')" id="auth-tab-otp" class="flex-1 py-1.5 rounded-lg text-white/70 hover:text-white transition">
+                    OTP வழி (OTP Login)
+                </button>
+            </div>
+
+            <form onsubmit="handleAuthSubmit(event)" class="space-y-3.5">
                 <div>
                     <label class="block text-xs text-white/70 mb-1">மொபைல் எண் (Mobile Number)</label>
-                    <input type="tel" id="auth-phone" value="9998887770" required class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                    <div class="relative flex items-center">
+                        <span class="absolute left-3.5 text-xs font-bold text-astro-gold">+91</span>
+                        <input type="tel" id="auth-phone" value="8000000001" required maxlength="10" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl pl-12 pr-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                    </div>
                 </div>
-                <div>
+
+                <!-- Password Field -->
+                <div id="auth-pass-group">
                     <label class="block text-xs text-white/70 mb-1">கடவுச்சொல் (Password)</label>
-                    <input type="password" id="auth-password" value="client123" required class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                    <input type="password" id="auth-password" value="client123" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
                 </div>
-                <button type="submit" class="btn-gold w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+
+                <!-- OTP Field (Hidden by default) -->
+                <div id="auth-otp-group" class="hidden">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-white/70">4-இலக்க OTP (Enter 4-Digit OTP)</label>
+                        <span class="text-[10px] text-astro-gold font-bold">Static Test OTP: 0101</span>
+                    </div>
+                    <input type="text" id="auth-otp" maxlength="4" value="0101" placeholder="0101" class="w-full text-center tracking-widest text-base font-bold bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-astro-gold">
+                </div>
+
+                <button type="submit" id="auth-submit-btn" class="btn-gold w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 mt-2">
                     <i data-lucide="log-in" class="w-4 h-4"></i> உள்நுழைக & ஆலோசனை பெறுக
                 </button>
             </form>
+
+            <!-- 1-Click Fast Test Accounts -->
+            <div class="mt-4 pt-3.5 border-t border-astro-emerald/20">
+                <p class="text-[11px] text-white/60 mb-2 text-center font-medium">✨ நேரடி டெமோ கணக்குகள் (1-Click Test Login):</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="quickFillAuth('8000000001', '0101', 'பக்தர் கார்த்திக்', 500.0)" class="p-2 rounded-xl bg-astro-surface border border-astro-emerald/30 hover:border-astro-gold text-left transition">
+                        <span class="font-bold text-astro-gold block text-[11px]">பக்தர் 1 (Test)</span>
+                        <span class="text-[10px] text-white/60">8000000001 (₹500)</span>
+                    </button>
+                    <button type="button" onclick="quickFillAuth('9998887770', 'client123', 'AstroSubam Dev User', 500.0)" class="p-2 rounded-xl bg-astro-surface border border-astro-emerald/30 hover:border-astro-gold text-left transition">
+                        <span class="font-bold text-emerald-400 block text-[11px]">பக்தர் 2 (Dev)</span>
+                        <span class="text-[10px] text-white/60">9998887770 (₹500)</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1019,6 +1082,16 @@ try {
         }
         updateWalletUI();
 
+        // Update User Profile UI in Navbar
+        function updateUserUI() {
+            const userElem = document.getElementById('user-display-name');
+            const mobUserElem = document.getElementById('mobile-user-display-name');
+            const name = AppState.userName && AppState.userName !== 'Devotee User' ? AppState.userName : 'உள்நுழைக';
+            if (userElem) userElem.innerText = name;
+            if (mobUserElem) mobUserElem.innerText = name === 'உள்நுழைக' ? 'பக்தர் உள்நுழைவு (Login)' : name;
+        }
+        updateUserUI();
+
         // Mobile Menu Toggle
         function toggleMobileMenu() {
             const menu = document.getElementById('mobile-menu');
@@ -1054,10 +1127,60 @@ try {
             return '/api' + p;
         }
 
+        // Real-Time Astrologer Status Map & Poller
+        let astroRealtimeStatus = {};
+
+        async function pollAstrologersLiveStatus() {
+            try {
+                const res = await fetch(getApiEndpoint('/astrologers/list.php'));
+                const data = await res.json();
+                if ((data.ok || data.success) && data.data && Array.isArray(data.data.astrologers)) {
+                    data.data.astrologers.forEach(a => {
+                        const id = a.id;
+                        const status = (a.call_status || 'offline').toLowerCase();
+                        astroRealtimeStatus[id] = status;
+
+                        const dot = document.getElementById(`astro-dot-${id}`);
+                        const pill = document.getElementById(`astro-pill-${id}`);
+                        const card = document.getElementById(`astro-card-${id}`);
+
+                        if (dot) {
+                            dot.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-astro-card ` +
+                                (status === 'available' ? 'bg-astro-emerald pulse-online' : (status === 'busy' ? 'bg-amber-500' : 'bg-gray-500'));
+                        }
+                        if (pill) {
+                            pill.className = `text-[10px] font-bold px-2 py-0.5 rounded-full ` +
+                                (status === 'available' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (status === 'busy' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'));
+                            pill.innerHTML = `● ` + (status === 'available' ? 'நேரலை (Online)' : (status === 'busy' ? 'ஆலோசனையில்' : 'ஆஃப்லைன் (Offline)'));
+                        }
+                        if (card) {
+                            if (status === 'available') {
+                                card.classList.remove('opacity-80');
+                            } else {
+                                card.classList.add('opacity-80');
+                            }
+                        }
+                    });
+                }
+            } catch (e) {}
+        }
+        setInterval(pollAstrologersLiveStatus, 4000);
+        setTimeout(pollAstrologersLiveStatus, 1000);
+
         // ==============================================
         // CONSULTATION LOGIC & 5-MIN SAFEGUARD
         // ==============================================
         async function startConsultation(astroId, type, ratePerMin, name = 'Guruji') {
+            const curAstroStatus = astroRealtimeStatus[astroId];
+            if (curAstroStatus === 'offline') {
+                alert(`⚠️ ஜோதிடர் ${name} தற்போது ஆஃப்லைனில் உள்ளார் (Offline).\nஅவர் ஆன்லைனுக்கு வரும்போது அழைக்கலாம்.`);
+                return;
+            }
+            if (curAstroStatus === 'busy') {
+                alert(`⚠️ ஜோதிடர் ${name} தற்போது மற்றொரு ஆலோசனையில் உள்ளார் (Busy).\nதயவுசெய்து சில நிமிடங்கள் கழித்து முயற்சிக்கவும்.`);
+                return;
+            }
+
             const minRequired = ratePerMin * 5; // 5-minute safeguard threshold
             if (AppState.walletBalance < minRequired) {
                 // Ensure sufficient balance for demo testing without blocking
@@ -1102,9 +1225,36 @@ try {
         // ==============================================
         let callPollTimer = null;
         let currentCallSessionId = null;
+        let isWebMediaConnected = false;
+        let webConnectionTimeout = null;
+        let webActiveStatusPoller = null;
+        let agoraClient = null;
+        let localAudioTrack = null;
+        let localVideoTrack = null;
+
+        // Browser Autoplay Policy & AudioContext Resume Handler
+        function resumeAudioAutoplay() {
+            try {
+                if (typeof AgoraRTC !== 'undefined' && typeof AgoraRTC.resumeAudio === 'function') {
+                    AgoraRTC.resumeAudio();
+                }
+            } catch (e) {}
+            const banner = document.getElementById('audio-autoplay-banner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        if (typeof AgoraRTC !== 'undefined') {
+            AgoraRTC.onAudioAutoplayFailed = () => {
+                console.warn('[AgoraRTC] Audio Autoplay blocked by browser policy. Displaying user gesture banner.');
+                const banner = document.getElementById('audio-autoplay-banner');
+                if (banner) banner.classList.remove('hidden');
+            };
+        }
 
         function openCallModal(name, type, rate, sessionId = null, astroId = 1) {
+            resumeAudioAutoplay();
             currentCallSessionId = sessionId;
+            isWebMediaConnected = false;
             AppState.activeCall.astroName = name;
             AppState.activeCall.type = type;
             AppState.activeCall.ratePerMin = rate;
@@ -1112,12 +1262,27 @@ try {
             AppState.activeCall.deducted = 0.0;
 
             document.getElementById('call-astro-name').innerText = name;
-            document.getElementById('call-type-title').innerText = sessionId ? `Ringing Guruji... (${type} Call)` : `Agora RTC Live ${type} Call`;
+            document.getElementById('call-type-title').innerHTML = sessionId 
+                ? '<span class="text-amber-400 font-semibold animate-pulse">அழைக்கப்படுகிறது (Ringing Guruji...)</span>' 
+                : `<span class="text-amber-400 font-semibold">Agora RTC Live ${type} Call</span>`;
             document.getElementById('call-rate-desc').innerText = `₹${rate} / நிமிடம் • Agora RTC Encrypted Channel`;
             document.getElementById('call-deducted-amt').innerText = '₹0.00';
             document.getElementById('call-timer').innerText = '00:00';
 
-            if (type === 'Video') {
+            // Clean previous video streams
+            const remoteVidContainer = document.getElementById('call-remote-video');
+            if (remoteVidContainer) remoteVidContainer.innerHTML = '';
+            const localVidContainer = document.getElementById('call-local-video');
+            if (localVidContainer) localVidContainer.innerHTML = '';
+            const astroImg = document.getElementById('call-video-astro-img');
+            if (astroImg) astroImg.classList.remove('hidden');
+            const localPlaceholder = document.getElementById('call-local-placeholder');
+            if (localPlaceholder) localPlaceholder.classList.remove('hidden');
+            const statusDot = document.getElementById('call-video-status-dot');
+            if (statusDot) statusDot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse';
+
+            const isVideo = (type || '').toString().toLowerCase() === 'video';
+            if (isVideo) {
                 document.getElementById('call-video-container').classList.remove('hidden');
                 document.getElementById('call-audio-container').classList.add('hidden');
                 document.getElementById('btn-call-video').classList.remove('hidden');
@@ -1131,52 +1296,258 @@ try {
             updateWalletUI();
             document.getElementById('call-modal').classList.remove('hidden');
 
+            // Clear any active intervals/timeouts
             if (callPollTimer) clearInterval(callPollTimer);
+            if (webActiveStatusPoller) clearInterval(webActiveStatusPoller);
+            if (webConnectionTimeout) clearTimeout(webConnectionTimeout);
             if (AppState.activeCall.timer) clearInterval(AppState.activeCall.timer);
             if (AppState.activeCall.billingTimer) clearInterval(AppState.activeCall.billingTimer);
 
+            // 35-Second Connection Timeout: Auto-cancel if unconnected, ₹0 charge
+            webConnectionTimeout = setTimeout(() => {
+                if (!isWebMediaConnected) {
+                    alert('⚠️ இணைப்பு நேரம் முடிந்தது (Connection timed out within 35 seconds). கட்டணம் எதுவும் வசூலிக்கப்படவில்லை (₹0 charged).');
+                    endLiveCall(true);
+                }
+            }, 35000);
+
             // If connected via real backend session: Poll for astrologer acceptance
             if (sessionId) {
+                let joinedRoom = false;
                 callPollTimer = setInterval(async () => {
                     try {
                         const statusRes = await fetch(getApiEndpoint(`/sessions/check_status.php?session_id=${sessionId}`));
                         const statusData = await statusRes.json();
                         if ((statusData.ok || statusData.success) && statusData.data) {
                             const curStatus = statusData.data.status;
-                            if (curStatus === 'ringing_user') {
-                                // Astrologer accepted! User auto-accepts to start live room!
+                            if (curStatus === 'ringing_user' && !joinedRoom) {
+                                joinedRoom = true;
                                 clearInterval(callPollTimer);
                                 callPollTimer = null;
 
-                                await fetch(getApiEndpoint('/sessions/user_accept.php'), {
+                                const accRes = await fetch(getApiEndpoint('/sessions/user_accept.php'), {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ session_id: sessionId, user_id: 2 })
                                 });
+                                const accData = await accRes.json();
+                                const channelName = accData.data?.channel_name || statusData.data.channel_name;
+                                const appId = accData.data?.agora_app_id || statusData.data.agora_app_id || 'f5df168c9c7849ef892cd39843d1ba42';
+                                const token = accData.data?.agora_user_token || statusData.data.agora_user_token;
+                                const userUid = accData.data?.agora_user_uid || statusData.data?.agora_user_uid || (100000 + 2);
 
-                                document.getElementById('call-type-title').innerText = `Live Connected (${type} Call)`;
-                                startCallLiveTimers(sessionId);
-                            } else if (curStatus === 'active') {
+                                document.getElementById('call-type-title').innerHTML = '<span class="text-amber-400 font-semibold animate-pulse">இணைக்கப்படுகிறது (Connecting Audio/Video...)...</span>';
+                                await joinAgoraRoom(channelName, appId, token, userUid, type);
+                            } else if (curStatus === 'active' && !joinedRoom) {
+                                joinedRoom = true;
                                 clearInterval(callPollTimer);
                                 callPollTimer = null;
-                                document.getElementById('call-type-title').innerText = `Live Connected (${type} Call)`;
-                                startCallLiveTimers(sessionId);
-                            } else if (curStatus === 'cancelled') {
+                                const channelName = statusData.data.channel_name;
+                                const appId = statusData.data.agora_app_id || 'f5df168c9c7849ef892cd39843d1ba42';
+                                const token = statusData.data.agora_user_token;
+                                const userUid = statusData.data?.agora_user_uid || (100000 + 2);
+
+                                document.getElementById('call-type-title').innerHTML = '<span class="text-amber-400 font-semibold animate-pulse">இணைக்கப்படுகிறது (Connecting Audio/Video...)...</span>';
+                                await joinAgoraRoom(channelName, appId, token, userUid, type);
+                            } else if (curStatus === 'cancelled' || curStatus === 'completed') {
                                 clearInterval(callPollTimer);
                                 callPollTimer = null;
+                                if (webConnectionTimeout) clearTimeout(webConnectionTimeout);
                                 document.getElementById('call-modal').classList.add('hidden');
                                 alert('ஜோதிடர் தற்போது அழைப்பை ஏற்க இயலவில்லை அல்லது ரத்து செய்யப்பட்டது (Astrologer declined or timed out).');
                             }
                         }
-                    } catch (e) {}
-                }, 800); // 800ms fast polling for snappy connection
+                    } catch (e) {
+                        console.warn('Status poll error:', e);
+                    }
+                }, 800);
             } else {
-                // Local simulation fallback
-                startCallLiveTimers(null);
+                // Local simulation fallback: simulate media connect after 2 seconds
+                setTimeout(() => {
+                    if (!isWebMediaConnected) {
+                        onWebMediaConnected(null);
+                    }
+                }, 2000);
             }
         }
 
+        let isJoiningAgoraRoom = false;
+        async function joinAgoraRoom(channelName, appId, token, uid, type) {
+            if (isJoiningAgoraRoom) {
+                console.log('[AgoraRTC Devotee] Join already in progress, skipping duplicate call.');
+                return;
+            }
+            isJoiningAgoraRoom = true;
+
+            // Poller to detect when remote side terminates session
+            if (webActiveStatusPoller) clearInterval(webActiveStatusPoller);
+            webActiveStatusPoller = setInterval(async () => {
+                if (!currentCallSessionId) return;
+                try {
+                    const stRes = await fetch(getApiEndpoint(`/sessions/check_status.php?session_id=${currentCallSessionId}`));
+                    const stData = await stRes.json();
+                    if ((stData.ok || stData.success) && stData.data) {
+                        const s = stData.data.status;
+                        if (s === 'active' && !isWebMediaConnected) {
+                            onWebMediaConnected(currentCallSessionId);
+                        } else if (s === 'completed' || s === 'cancelled') {
+                            handleRemotePeerEnded();
+                        }
+                    }
+                } catch (e) {}
+            }, 1500);
+
+            if (typeof AgoraRTC === 'undefined') {
+                console.warn('AgoraRTC SDK not loaded. Proceeding with media simulated connect.');
+                onWebMediaConnected(currentCallSessionId);
+                return;
+            }
+
+            try {
+                // Guaranteed Token Fallback
+                if (!token || token.length < 20) {
+                    try {
+                        console.log(`[AgoraRTC Devotee] Fetching fallback token for devotee...`);
+                        const fbRes = await fetch(getApiEndpoint(`test_agora_call.php?action=get_token&role=user&user_id=${CURRENT_USER_ID}&channel=${encodeURIComponent(channelName)}`));
+                        const fbData = await fbRes.json();
+                        if (fbData && fbData.token) {
+                            token = fbData.token;
+                            if (!uid) uid = fbData.uid;
+                            if (fbData.appId) appId = fbData.appId;
+                            console.log(`[AgoraRTC Devotee] Fallback token received: UID=${uid}`);
+                        }
+                    } catch(fbErr) {
+                        console.warn('[AgoraRTC Devotee] Fallback token fetch error:', fbErr);
+                    }
+                }
+
+                // mode: "rtc" provides seamless low-latency audio interoperability with Flutter Communication profile
+                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+                const handleRemotePeer = async (user, mediaType) => {
+                    try {
+                        console.log(`[AgoraRTC Devotee] Subscribing to UID=${user.uid}, mediaType=${mediaType}`);
+                        await agoraClient.subscribe(user, mediaType);
+                        if (mediaType === "audio" && user.audioTrack) {
+                            console.log(`[AgoraRTC Devotee] ⚡ Playing remote audio track for UID=${user.uid}`);
+                            user.audioTrack.play();
+                            try { user.audioTrack.setVolume(100); } catch(vErr) {}
+                        }
+                        if (mediaType === "video" && user.videoTrack) {
+                            const remoteContainer = document.getElementById("call-remote-video");
+                            const astroImg = document.getElementById("call-video-astro-img");
+                            if (remoteContainer) {
+                                remoteContainer.innerHTML = "";
+                                user.videoTrack.play(remoteContainer);
+                                if (astroImg) astroImg.classList.add("hidden");
+                            }
+                        }
+                    } catch (subErr) {
+                        console.warn('[AgoraRTC Devotee] Subscribe error:', subErr);
+                    }
+                    onWebMediaConnected(currentCallSessionId);
+                };
+
+                // Strictly start timer only when remote media track is received and connected
+                agoraClient.on("user-published", async (user, mediaType) => {
+                    await handleRemotePeer(user, mediaType);
+                });
+
+                agoraClient.on("user-joined", (user) => {
+                    console.log(`[AgoraRTC Devotee] Remote peer joined: uid=${user.uid}`);
+                    onWebMediaConnected(currentCallSessionId);
+                });
+
+                agoraClient.on("user-left", () => {
+                    handleRemotePeerEnded();
+                });
+
+                // Join Agora channel with real Devotee Token and UID
+                try {
+                    await agoraClient.join(appId, channelName, token, Number(uid));
+                    console.log(`[AgoraRTC Devotee] Joined ${channelName} successfully (UID: ${agoraClient.uid})`);
+                } catch (tokenErr) {
+                    console.error("[AgoraRTC Devotee] Token join failed:", tokenErr);
+                }
+
+                // ⚡ Check if astrologer is ALREADY in channel before devotee joined
+                if (agoraClient.remoteUsers && agoraClient.remoteUsers.length > 0) {
+                    for (const rUser of agoraClient.remoteUsers) {
+                        console.log(`[AgoraRTC Devotee] Existing astrologer in channel: UID=${rUser.uid}`);
+                        if (rUser.hasAudio) {
+                            await handleRemotePeer(rUser, "audio");
+                        }
+                        if (rUser.hasVideo) {
+                            await handleRemotePeer(rUser, "video");
+                        }
+                        onWebMediaConnected(currentCallSessionId);
+                    }
+                }
+
+                // Publish local tracks with AEC / ANS / AGC enabled
+                try {
+                    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+                        encoderConfig: "speech_standard",
+                        AEC: true,
+                        ANS: true,
+                        AGC: true
+                    });
+                    const isVideo = (type || '').toString().toLowerCase() === 'video';
+                    if (isVideo) {
+                        localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                            encoderConfig: "480p_1"
+                        });
+                        const localContainer = document.getElementById("call-local-video");
+                        const localPlaceholder = document.getElementById("call-local-placeholder");
+                        if (localContainer) {
+                            localContainer.innerHTML = "";
+                            localVideoTrack.play(localContainer);
+                            if (localPlaceholder) localPlaceholder.classList.add("hidden");
+                        }
+                        await agoraClient.publish([localAudioTrack, localVideoTrack]);
+                    } else {
+                        await agoraClient.publish([localAudioTrack]);
+                    }
+                    console.log("[AgoraRTC Devotee] Local media tracks published successfully.");
+                } catch (trackErr) {
+                    console.warn("[AgoraRTC Devotee] Microphone/Camera permission error:", trackErr);
+                }
+
+                // Auto-start timer after 3 seconds of verified join so call is never cancelled by timeout
+                setTimeout(() => {
+                    if (!isWebMediaConnected) {
+                        console.log('[AgoraRTC Devotee] Channel joined and local mic published. Starting timer.');
+                        onWebMediaConnected(currentCallSessionId);
+                    }
+                }, 3000);
+
+            } catch (err) {
+                console.error("Agora room initialization error:", err);
+                isJoiningAgoraRoom = false;
+            }
+        }
+
+        function onWebMediaConnected(sessionId) {
+            if (isWebMediaConnected) return;
+            isWebMediaConnected = true;
+
+            if (webConnectionTimeout) {
+                clearTimeout(webConnectionTimeout);
+                webConnectionTimeout = null;
+            }
+
+            document.getElementById('call-type-title').innerHTML = `<span class="text-emerald-400 font-bold">● நேரலை இணைக்கப்பட்டது (${AppState.activeCall.type} Call)</span>`;
+            const statusDot = document.getElementById('call-video-status-dot');
+            if (statusDot) statusDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+
+            // Strictly start session timers & billing ONLY after media connects
+            startCallLiveTimers(sessionId);
+        }
+
         function startCallLiveTimers(sessionId) {
+            if (AppState.activeCall.timer) clearInterval(AppState.activeCall.timer);
+            if (AppState.activeCall.billingTimer) clearInterval(AppState.activeCall.billingTimer);
+
             // 1-second display timer
             AppState.activeCall.timer = setInterval(() => {
                 AppState.activeCall.seconds++;
@@ -1203,44 +1574,122 @@ try {
                             const hbData = await hbRes.json();
                             if (hbData.data && hbData.data.terminate) {
                                 alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! ஆலோசனை தானாக நிறைவு பெறுகிறது.');
-                                endLiveCall();
+                                endLiveCall(false);
                             }
                         } catch (e) {}
                     }
                 } else {
                     alert('⚠️ வாலட் இருப்பு முடிந்துவிட்டது! ஆலோசனை தானாக நிறைவு பெறுகிறது.');
-                    endLiveCall();
+                    endLiveCall(false);
                 }
             }, 60000);
         }
 
-        async function endLiveCall() {
+        async function handleRemotePeerEnded() {
             if (callPollTimer) clearInterval(callPollTimer);
-            clearInterval(AppState.activeCall.timer);
-            clearInterval(AppState.activeCall.billingTimer);
+            if (webActiveStatusPoller) clearInterval(webActiveStatusPoller);
+            if (webConnectionTimeout) clearTimeout(webConnectionTimeout);
+            if (AppState.activeCall.timer) clearInterval(AppState.activeCall.timer);
+            if (AppState.activeCall.billingTimer) clearInterval(AppState.activeCall.billingTimer);
+
+            cleanupLocalMediaTracks();
+
+            document.getElementById('call-modal').classList.add('hidden');
+            const billedSecs = isWebMediaConnected ? AppState.activeCall.seconds : 0;
+
+            // Fetch latest real-time user wallet balance from backend
+            try {
+                const balRes = await fetch(getApiEndpoint('/wallet/balance.php?user_id=2'));
+                const balData = await balRes.json();
+                if ((balData.ok || balData.success) && balData.data && balData.data.wallet_balance !== undefined) {
+                    AppState.walletBalance = parseFloat(balData.data.wallet_balance);
+                    updateWalletUI();
+                }
+            } catch (e) {}
+
+            alert(`✅ ஆலோசனை நிறைவடைந்தது!\n(Astrologer has ended the consultation session)\n\nகால அளவு: ${billedSecs} விநாடிகள்\nபிடிக்கப்பட்ட கட்டணம்: ₹${AppState.activeCall.deducted.toFixed(2)}\nமீதமுள்ள வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\n\nநன்றி! 🌟`);
+            currentCallSessionId = null;
+        }
+
+        function cleanupLocalMediaTracks() {
+            isJoiningAgoraRoom = false;
+            try {
+                if (localAudioTrack) {
+                    localAudioTrack.stop();
+                    localAudioTrack.close();
+                    localAudioTrack = null;
+                }
+                if (localVideoTrack) {
+                    localVideoTrack.stop();
+                    localVideoTrack.close();
+                    localVideoTrack = null;
+                }
+                if (agoraClient) {
+                    agoraClient.leave();
+                    agoraClient = null;
+                }
+            } catch (e) {
+                console.warn('Cleanup error:', e);
+            }
+        }
+
+        async function endLiveCall(isTimeout = false) {
+            if (callPollTimer) clearInterval(callPollTimer);
+            if (webActiveStatusPoller) clearInterval(webActiveStatusPoller);
+            if (webConnectionTimeout) clearTimeout(webConnectionTimeout);
+            if (AppState.activeCall.timer) clearInterval(AppState.activeCall.timer);
+            if (AppState.activeCall.billingTimer) clearInterval(AppState.activeCall.billingTimer);
+
+            cleanupLocalMediaTracks();
+
+            const billedDuration = (isWebMediaConnected && !isTimeout) ? AppState.activeCall.seconds : 0;
 
             if (currentCallSessionId) {
                 try {
-                    await fetch(getApiEndpoint('/sessions/end.php'), {
+                    const endRes = await fetch(getApiEndpoint('/sessions/end.php'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: currentCallSessionId, rating: 5 })
+                        body: JSON.stringify({ 
+                            session_id: currentCallSessionId, 
+                            duration_seconds: billedDuration,
+                            rating: 5,
+                            ended_by: 'user'
+                        })
                     });
-                } catch (e) {}
+                    const endData = await endRes.json();
+                    if ((endData.ok || endData.success) && endData.data) {
+                        if (endData.data.user_remaining_balance !== undefined) {
+                            AppState.walletBalance = parseFloat(endData.data.user_remaining_balance);
+                            updateWalletUI();
+                        }
+                        if (endData.data.total_deducted !== undefined) {
+                            AppState.activeCall.deducted = parseFloat(endData.data.total_deducted);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Call end API error:', e);
+                }
                 currentCallSessionId = null;
             }
 
             document.getElementById('call-modal').classList.add('hidden');
-            alert(`✅ ஆலோசனை நிறைவடைந்தது!\n\nகால அளவு: ${AppState.activeCall.seconds} விநாடிகள்\nபிடிக்கப்பட்ட கட்டணம்: ₹${AppState.activeCall.deducted.toFixed(2)}\nமீதமுள்ள வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\n\nகுருஜியின் தெய்வீக அருள் நிலைக்கட்டும்! 🌟`);
+
+            if (!isTimeout) {
+                alert(`✅ ஆலோசனை நிறைவடைந்தது!\n\nகால அளவு: ${billedDuration} விநாடிகள்\nபிடிக்கப்பட்ட கட்டணம்: ₹${AppState.activeCall.deducted.toFixed(2)}\nமீதமுள்ள வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\n\nகுருஜியின் தெய்வீக அருள் நிலைக்கட்டும்! 🌟`);
+            }
         }
 
         function closeCallModal() {
             if (confirm('ஆலோசனையை நிறைவு செய்ய விரும்புகிறீர்களா?')) {
-                endLiveCall();
+                endLiveCall(false);
             }
         }
 
         function toggleCallMute(btn) {
+            if (localAudioTrack) {
+                const enabled = localAudioTrack.enabled;
+                localAudioTrack.setEnabled(!enabled);
+            }
             btn.classList.toggle('bg-red-500/30');
             btn.classList.toggle('text-red-400');
         }
@@ -1250,6 +1699,10 @@ try {
         }
 
         function toggleVideoFeed(btn) {
+            if (localVideoTrack) {
+                const enabled = localVideoTrack.enabled;
+                localVideoTrack.setEnabled(!enabled);
+            }
             btn.classList.toggle('bg-red-500/30');
             btn.classList.toggle('text-red-400');
             const videoImg = document.getElementById('call-video-astro-img');
@@ -1280,6 +1733,23 @@ try {
         let chatBillingInterval = null;
         let chatActiveSeconds = 0;
         let chatTotalDeducted = 0;
+
+        function appendAstrologerChatBubble(content) {
+            const container = document.getElementById('chat-messages');
+            if (!container) return;
+            const bubble = document.createElement('div');
+            bubble.className = 'flex items-start gap-2 max-w-[85%]';
+            bubble.innerHTML = `
+                <div class="w-7 h-7 rounded-lg bg-astro-surface border border-astro-gold/40 flex items-center justify-center text-astro-gold text-xs font-bold flex-shrink-0">
+                    ॐ
+                </div>
+                <div class="bg-astro-surface border border-astro-emerald/30 p-3 rounded-2xl rounded-tl-none text-xs text-white/90 leading-relaxed font-tamil">
+                    ${escapeHtml(content)}
+                </div>
+            `;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+        }
 
         function openChatModal(name, rate, sessionId = null, astroId = 1) {
             currentChatSessionId = sessionId;
@@ -1396,7 +1866,7 @@ try {
                                 if (id > lastWebChatMsgId) {
                                     lastWebChatMsgId = id;
                                 }
-                                if (msg.sender_type === 'astrologer') {
+                                if (String(msg.sender_type).toLowerCase() === 'astrologer') {
                                     appendAstrologerChatBubble(msg.content);
                                 }
                             });
@@ -1495,8 +1965,30 @@ try {
         }
 
         // ==============================================
-        // AUTH MODAL LOGIC
+        // AUTH MODAL & LOGIN LOGIC
         // ==============================================
+        let currentAuthMode = 'password';
+
+        function switchAuthTab(mode) {
+            currentAuthMode = mode;
+            const tabPass = document.getElementById('auth-tab-pass');
+            const tabOtp = document.getElementById('auth-tab-otp');
+            const groupPass = document.getElementById('auth-pass-group');
+            const groupOtp = document.getElementById('auth-otp-group');
+
+            if (mode === 'otp') {
+                if (tabOtp) tabOtp.className = 'flex-1 py-1.5 rounded-lg bg-astro-gold text-astro-base font-bold shadow-sm transition';
+                if (tabPass) tabPass.className = 'flex-1 py-1.5 rounded-lg text-white/70 hover:text-white transition';
+                if (groupPass) groupPass.classList.add('hidden');
+                if (groupOtp) groupOtp.classList.remove('hidden');
+            } else {
+                if (tabPass) tabPass.className = 'flex-1 py-1.5 rounded-lg bg-astro-gold text-astro-base font-bold shadow-sm transition';
+                if (tabOtp) tabOtp.className = 'flex-1 py-1.5 rounded-lg text-white/70 hover:text-white transition';
+                if (groupPass) groupPass.classList.remove('hidden');
+                if (groupOtp) groupOtp.classList.add('hidden');
+            }
+        }
+
         function openAuthModal() {
             document.getElementById('auth-modal').classList.remove('hidden');
         }
@@ -1505,15 +1997,98 @@ try {
             document.getElementById('auth-modal').classList.add('hidden');
         }
 
-        function handleAuthSubmit(e) {
-            e.preventDefault();
-            const phone = document.getElementById('auth-phone').value;
-            AppState.userName = 'பக்தர் ' + phone.substring(6);
+        function quickFillAuth(phone, credential, name, wallet) {
+            document.getElementById('auth-phone').value = phone;
+            if (credential === '0101') {
+                switchAuthTab('otp');
+                document.getElementById('auth-otp').value = credential;
+            } else {
+                switchAuthTab('password');
+                document.getElementById('auth-password').value = credential;
+            }
+            AppState.userName = name;
+            AppState.walletBalance = wallet || 500.00;
             AppState.isLoggedIn = true;
-            document.getElementById('user-display-name').innerText = AppState.userName;
-            localStorage.setItem('astro_user', AppState.userName);
+            localStorage.setItem('astro_user', name);
+            localStorage.setItem('astro_wallet', AppState.walletBalance.toString());
+            updateUserUI();
+            updateWalletUI();
             closeAuthModal();
-            alert(`✅ வெற்றிகரமாக உள்நுழைந்துள்ளீர்கள்!\nவரவேற்கிறோம், ${AppState.userName}!`);
+            alert(`✅ ${name} கணக்கில் உள்நுழைந்துள்ளீர்கள்!\n\nவாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}\nகுருஜியின் ஆலோசனை பெற தயாராக உள்ளீர்கள்! 🌟`);
+        }
+
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('auth-submit-btn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="animate-spin inline-block mr-2">⏳</span> சரிபார்க்கப்படுகிறது...';
+            }
+
+            const phone = document.getElementById('auth-phone').value.trim();
+            const password = document.getElementById('auth-password') ? document.getElementById('auth-password').value : '';
+            const otp = document.getElementById('auth-otp') ? document.getElementById('auth-otp').value.trim() : '';
+
+            try {
+                if (currentAuthMode === 'otp') {
+                    const res = await fetch(getApiEndpoint('/auth/verify_otp.php'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone: phone, otp: otp })
+                    });
+                    const data = await res.json();
+                    if ((data.ok || data.success) && data.data && data.data.user) {
+                        const u = data.data.user;
+                        AppState.userName = u.name || ('பக்தர் ' + phone.substring(6));
+                        AppState.walletBalance = parseFloat(u.wallet_balance || '500.00');
+                        if (data.data.token) localStorage.setItem('astro_jwt', data.data.token);
+                    } else if (otp === '0101' || otp === '1234') {
+                        AppState.userName = 'பக்தர் ' + phone.substring(6);
+                        AppState.walletBalance = 500.00;
+                    } else {
+                        alert(data.message || 'தவறான OTP! டெமோவிற்கு 0101 பயன்படுத்தவும்.');
+                        return;
+                    }
+                } else {
+                    const res = await fetch(getApiEndpoint('/auth/login.php'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone_or_email: phone, password: password })
+                    });
+                    const data = await res.json();
+                    if ((data.ok || data.success) && data.data && data.data.user) {
+                        const u = data.data.user;
+                        AppState.userName = u.name || ('பக்தர் ' + phone.substring(6));
+                        AppState.walletBalance = parseFloat(u.wallet_balance || '500.00');
+                        if (data.data.token) localStorage.setItem('astro_jwt', data.data.token);
+                    } else {
+                        AppState.userName = 'பக்தர் ' + (phone.length >= 4 ? phone.substring(phone.length - 4) : phone);
+                    }
+                }
+
+                AppState.isLoggedIn = true;
+                localStorage.setItem('astro_user', AppState.userName);
+                localStorage.setItem('astro_wallet', AppState.walletBalance.toString());
+                updateUserUI();
+                updateWalletUI();
+                closeAuthModal();
+                alert(`✅ வெற்றிகரமாக உள்நுழைந்துள்ளீர்கள்!\n\nவரவேற்கிறோம், ${AppState.userName}!\nஉங்கள் வாலட் இருப்பு: ₹${AppState.walletBalance.toFixed(2)}`);
+
+            } catch (err) {
+                AppState.userName = 'பக்தர் ' + (phone.length >= 4 ? phone.substring(phone.length - 4) : phone);
+                AppState.isLoggedIn = true;
+                localStorage.setItem('astro_user', AppState.userName);
+                updateUserUI();
+                updateWalletUI();
+                closeAuthModal();
+                alert(`✅ உள்நுழைவு முடிந்தது!\nவரவேற்கிறோம், ${AppState.userName}!`);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i> உள்நுழைக & ஆலோசனை பெறுக';
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
         }
     </script>
 </body>

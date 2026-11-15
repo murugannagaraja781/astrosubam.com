@@ -78,7 +78,7 @@ foreach ($lines as $line) {
     }
 }
 check("Parser: DB_NAME", ($parsedVars['DB_NAME'] ?? '') === 'u170490412_subamadmin', "Parsed DB_NAME = {$parsedVars['DB_NAME']}");
-check("Parser: AGORA_APP_ID", ($parsedVars['AGORA_APP_ID'] ?? '') === '8c0ca8c1b8bc403d814f8f86653e07c3', "Parsed AGORA_APP_ID");
+check("Parser: AGORA_APP_ID", ($parsedVars['AGORA_APP_ID'] ?? '') === 'f5df168c9c7849ef892cd39843d1ba42', "Parsed AGORA_APP_ID");
 check("Parser: PING4SMS_API_KEY", ($parsedVars['PING4SMS_API_KEY'] ?? '') === 'e1fc54301c0da93b95d3502a3151f420', "Parsed PING4SMS_API_KEY");
 
 // -------------------------------------------------------------

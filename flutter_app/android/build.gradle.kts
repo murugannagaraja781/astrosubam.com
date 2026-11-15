@@ -1,3 +1,7 @@
+extra["compileSdkVersion"] = 36
+extra["minSdkVersion"] = 21
+extra["targetSdkVersion"] = 34
+
 allprojects {
     repositories {
         google()
@@ -15,6 +19,16 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
+subprojects {
+    plugins.withId("com.android.library") {
+        val android = extensions.findByName("android")
+        if (android is com.android.build.gradle.BaseExtension) {
+            android.compileSdkVersion(36)
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }

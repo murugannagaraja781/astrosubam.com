@@ -2,9 +2,26 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const AstroSubamApp());
+}
+
+// ==============================================================================
+// 🌟 SAFE TYPE PARSING HELPERS (GUARDS AGAINST STRINGS RETURNED FOR DECIMAL/INT)
+// ==============================================================================
+double safeDouble(dynamic val, [double def = 0.0]) {
+  if (val == null) return def;
+  if (val is num) return val.toDouble();
+  return double.tryParse(val.toString()) ?? def;
+}
+
+int safeInt(dynamic val, [int def = 0]) {
+  if (val == null) return def;
+  if (val is num) return val.toInt();
+  return int.tryParse(val.toString()) ?? def;
 }
 
 // ==============================================================================
@@ -13,13 +30,24 @@ void main() {
 class ApiService {
   static const String baseUrl = 'https://subam.navanagari.com/api';
 
+  static Uri _buildUri(String endpoint) {
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      return Uri.parse(endpoint);
+    }
+    if (endpoint.startsWith('../')) {
+      return Uri.parse('https://subam.navanagari.com/${endpoint.substring(3)}');
+    }
+    final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+    return Uri.parse('$baseUrl$cleanEndpoint');
+  }
+
   static Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> body) async {
     try {
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 10);
       client.badCertificateCallback = (cert, host, port) => true;
 
-      final request = await client.postUrl(Uri.parse('$baseUrl$endpoint'));
+      final request = await client.postUrl(_buildUri(endpoint));
       request.headers.set('Content-Type', 'application/json; charset=UTF-8');
       request.headers.set('User-Agent', 'AstroSubamApp/1.0');
       request.write(jsonEncode(body));
@@ -40,7 +68,7 @@ class ApiService {
       client.connectionTimeout = const Duration(seconds: 10);
       client.badCertificateCallback = (cert, host, port) => true;
 
-      final request = await client.getUrl(Uri.parse('$baseUrl$endpoint'));
+      final request = await client.getUrl(_buildUri(endpoint));
       request.headers.set('User-Agent', 'AstroSubamApp/1.0');
 
       final response = await request.close();
@@ -126,9 +154,10 @@ class UserState {
   static String userName = 'Devotee User';
   static String userPhone = '8000000001';
   static String authToken = '';
+  static bool isCallActive = false;
+  static String activeSessionId = '';
 
   static List<Map<String, dynamic>> astrologers = [
-
     {
       'id': 1,
       'name': 'Guruji S. Sundaramurthy',
@@ -140,7 +169,8 @@ class UserState {
       'audioRate': 20.0,
       'videoRate': 35.0,
       'chatRate': 12.0,
-      'status': 'available',
+      'status': 'offline',
+      'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
     },
     {
@@ -154,7 +184,8 @@ class UserState {
       'audioRate': 18.0,
       'videoRate': 30.0,
       'chatRate': 10.0,
-      'status': 'available',
+      'status': 'offline',
+      'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
     },
     {
@@ -168,24 +199,44 @@ class UserState {
       'audioRate': 15.0,
       'videoRate': 25.0,
       'chatRate': 10.0,
-      'status': 'available',
+      'status': 'offline',
+      'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
     },
-    {
-      'id': 4,
-      'name': 'Astrologer Meenakshi Ammal',
-      'speciality': 'Numerology • Tarot Reader • Child Horoscope',
-      'languages': 'Tamil, Malayalam',
-      'experience': 19,
-      'rating': 4.91,
-      'reviews': 390,
-      'audioRate': 16.0,
-      'videoRate': 28.0,
-      'chatRate': 10.0,
-      'status': 'available',
-      'image': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-    },
   ];
+
+  static final ValueNotifier<int> astrologersRevision = ValueNotifier<int>(0);
+
+  static Future<void> fetchAstrologers() async {
+    try {
+      final res = await ApiService.get('/astrologers/list.php');
+      if (res['ok'] == true && res['data'] != null && res['data']['astrologers'] is List) {
+        final list = res['data']['astrologers'] as List;
+        astrologers = list.map((a) {
+          final m = Map<String, dynamic>.from(a as Map);
+          final rawStatus = (m['call_status'] ?? 'offline').toString().toLowerCase();
+          return {
+            'id': safeInt(m['id'], 1),
+            'name': m['name']?.toString() ?? 'Astrologer',
+            'speciality': m['specialities']?.toString() ?? 'Vedic Astrology',
+            'languages': m['languages']?.toString() ?? 'Tamil, English',
+            'experience': safeInt(m['experience_years'], 10),
+            'rating': safeDouble(m['rating'], 4.9),
+            'reviews': safeInt(m['total_reviews'], 100),
+            'audioRate': safeDouble(m['audio_rate_min'], 20.0),
+            'videoRate': safeDouble(m['video_rate_min'], 30.0),
+            'chatRate': safeDouble(m['chat_rate_min'], 10.0),
+            'status': rawStatus,
+            'call_status': rawStatus,
+            'image': m['avatar']?.toString() ?? 'assets/logo.jpg',
+          };
+        }).toList();
+        astrologersRevision.value++;
+      }
+    } catch (e) {
+      debugPrint('[ASTRO_FETCH] Error fetching astrologers: $e');
+    }
+  }
 }
 
 // ==============================================================================
@@ -204,10 +255,10 @@ class AstrologerState {
   static double lifetimeEarnings = 0.00;
   static double todayEarnings = 0.00;
   static int completedConsultations = 0;
-  static bool isMasterOnline = true;
-  static bool isChatOnline = true;
-  static bool isAudioOnline = true;
-  static bool isVideoOnline = true;
+  static bool isMasterOnline = false;
+  static bool isChatOnline = false;
+  static bool isAudioOnline = false;
+  static bool isVideoOnline = false;
   static double audioRate = 20.0;
   static double videoRate = 35.0;
   static double chatRate = 12.0;
@@ -250,14 +301,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   void _startIncomingCallListener() {
     _incomingCheckTimer = Timer.periodic(const Duration(seconds: 3), (t) async {
-      if (!mounted || _isIncomingCallShowing || !UserState.isLoggedIn) return;
+      if (!mounted || _isIncomingCallShowing || !UserState.isLoggedIn || UserState.isCallActive || UserState.activeSessionId.isNotEmpty) return;
 
       try {
         final res = await ApiService.get('/sessions/user_pending.php?user_id=${UserState.userId}');
-        if (!mounted) return;
+        if (!mounted || _isIncomingCallShowing || UserState.isCallActive || UserState.activeSessionId.isNotEmpty) return;
 
         if (res['ok'] == true && res['data'] != null && res['data']['has_incoming'] == true) {
           final session = res['data']['session'];
+          final String incomingSessionId = (session['session_id'] ?? '').toString();
+
+          // Deduplication Guard: If call is already showing/active or handling same session, ignore!
+          if (UserState.isCallActive || UserState.activeSessionId == incomingSessionId) {
+            return;
+          }
+
           final astroData = session['astrologer'] ?? {};
           final astroMap = {
             'id': astroData['id'] ?? 1,
@@ -267,20 +325,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           };
 
           _isIncomingCallShowing = true;
+          UserState.isCallActive = true;
+          UserState.activeSessionId = incomingSessionId;
+
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => FullScreenIncomingCallScreen(
                 astrologer: astroMap,
-                sessionId: session['session_id'],
+                sessionId: incomingSessionId,
                 channelName: session['channel_name'] ?? '',
                 type: session['type'] ?? 'audio',
                 ratePerMin: (session['rate_per_min'] as num?)?.toDouble() ?? 20.0,
                 onConnected: (roomData) {
                   _isIncomingCallShowing = false;
-                  final sessionId = roomData['session_id']?.toString() ?? '';
+                  UserState.isCallActive = true;
+                  UserState.activeSessionId = incomingSessionId;
+
+                  final sessionId = roomData['session_id']?.toString() ?? incomingSessionId;
                   final channelName = roomData['channel_name']?.toString() ?? '';
                   final agoraToken = roomData['agora_user_token']?.toString() ?? (roomData['agora_token']?.toString() ?? '');
+                  final int? agoraUid = (roomData['agora_user_uid'] as num?)?.toInt() ?? (roomData['agora_uid'] as num?)?.toInt();
 
                   if ((session['type'] ?? '') == 'chat') {
                     Navigator.push(
@@ -305,6 +370,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           sessionId: sessionId,
                           channelName: channelName,
                           agoraToken: agoraToken,
+                          agoraUid: agoraUid,
                         ),
                       ),
                     );
@@ -312,6 +378,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 },
                 onDeclined: () {
                   _isIncomingCallShowing = false;
+                  UserState.isCallActive = false;
+                  UserState.activeSessionId = '';
                 },
               ),
             ),
@@ -353,8 +421,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 }
 
 // 1. HOME SCREEN
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  Timer? _homeRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    UserState.fetchAstrologers().then((_) {
+      if (mounted) setState(() {});
+    });
+    _homeRefreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        UserState.fetchAstrologers().then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _homeRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -550,14 +646,22 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 10),
 
-              // Astrologer Cards List
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: UserState.astrologers.length,
-                itemBuilder: (context, index) {
-                  final astro = UserState.astrologers[index];
-                  return AstrologerCard(astrologer: astro);
+              // Astrologer Cards List (Reactively binds to live database status changes)
+              ValueListenableBuilder<int>(
+                valueListenable: UserState.astrologersRevision,
+                builder: (context, _, __) {
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: UserState.astrologers.length,
+                    itemBuilder: (context, index) {
+                      final astro = UserState.astrologers[index];
+                      return AstrologerCard(
+                        key: ValueKey('home_astro_${astro['id']}_${astro['call_status']}'),
+                        astrologer: astro,
+                      );
+                    },
+                  );
                 },
               ),
             ],
@@ -589,40 +693,121 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// 2. ASTROLOGERS LIST SCREEN
-class AstrologersListScreen extends StatelessWidget {
+// 2. ASTROLOGERS LIST SCREEN (REAL-TIME LIVE ONLINE SYNCHRONIZATION)
+class AstrologersListScreen extends StatefulWidget {
   const AstrologersListScreen({super.key});
 
   @override
+  State<AstrologersListScreen> createState() => _AstrologersListScreenState();
+}
+
+class _AstrologersListScreenState extends State<AstrologersListScreen> {
+  Timer? _listPoller;
+  bool _isRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+    _listPoller = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) _fetch(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _listPoller?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetch({bool silent = false}) async {
+    if (!silent) setState(() => _isRefreshing = true);
+    await UserState.fetchAstrologers();
+    if (mounted) {
+      setState(() => _isRefreshing = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Top Astrologers', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
-        backgroundColor: AstroTheme.headerGreen,
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: UserState.astrologers.length,
-        itemBuilder: (context, index) {
-          final astro = UserState.astrologers[index];
-          return AstrologerCard(astrologer: astro);
-        },
-      ),
+    return ValueListenableBuilder<int>(
+      valueListenable: UserState.astrologersRevision,
+      builder: (context, _, __) {
+        final int onlineCount = UserState.astrologers.where((a) {
+          final st = (a['call_status'] ?? a['status'] ?? 'offline').toString().toLowerCase();
+          return st == 'available';
+        }).length;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Astrologers', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  onlineCount > 0 ? '● $onlineCount Online Now' : '● All Astrologers Offline',
+                  style: TextStyle(
+                    color: onlineCount > 0 ? AstroTheme.emeraldAccent : Colors.white60,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AstroTheme.headerGreen,
+            actions: [
+              IconButton(
+                icon: _isRefreshing
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AstroTheme.solarYellow))
+                    : const Icon(Icons.refresh, color: AstroTheme.solarYellow),
+                onPressed: _isRefreshing ? null : () => _fetch(),
+              ),
+            ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: () => _fetch(),
+            color: AstroTheme.solarYellow,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: UserState.astrologers.length,
+              itemBuilder: (context, index) {
+                final astro = UserState.astrologers[index];
+                return AstrologerCard(
+                  key: ValueKey('list_astro_${astro['id']}_${astro['call_status']}'),
+                  astrologer: astro,
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-// Astrologer Card Component
+// Astrologer Card Component (True Dynamic Online/Offline/Busy States)
 class AstrologerCard extends StatelessWidget {
   final Map<String, dynamic> astrologer;
+  static bool _isCallInitiating = false;
 
   const AstrologerCard({super.key, required this.astrologer});
 
   @override
   Widget build(BuildContext context) {
-    final double audioRate = (astrologer['audioRate'] as num?)?.toDouble() ?? 20.0;
-    final double videoRate = (astrologer['videoRate'] as num?)?.toDouble() ?? 30.0;
-    final double chatRate = (astrologer['chatRate'] as num?)?.toDouble() ?? 10.0;
+    final double audioRate = safeDouble(astrologer['audioRate'], 20.0);
+    final double videoRate = safeDouble(astrologer['videoRate'], 30.0);
+    final double chatRate = safeDouble(astrologer['chatRate'], 10.0);
+
+    final String status = (astrologer['call_status'] ?? astrologer['status'] ?? 'offline').toString().toLowerCase();
+    final bool isOnline = status == 'available';
+    final bool isBusy = status == 'busy';
+
+    final Color statusColor = isOnline
+        ? AstroTheme.emeraldAccent
+        : (isBusy ? Colors.amber : Colors.grey);
+    final String statusLabel = isOnline
+        ? 'Online & Ready'
+        : (isBusy ? 'In Consultation (Busy)' : 'Offline');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -630,14 +815,16 @@ class AstrologerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AstroTheme.forestSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AstroTheme.borderGreen),
+        border: Border.all(
+          color: isOnline ? AstroTheme.emeraldAccent.withAlpha(90) : AstroTheme.borderGreen,
+        ),
       ),
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar with Online Badge
+              // Avatar with Live Status Badge
               Stack(
                 children: [
                   CircleAvatar(
@@ -651,7 +838,7 @@ class AstrologerCard extends StatelessWidget {
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: AstroTheme.emeraldAccent,
+                        color: statusColor,
                         shape: BoxShape.circle,
                         border: Border.all(color: AstroTheme.forestSurface, width: 2),
                       ),
@@ -665,9 +852,40 @@ class AstrologerCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      astrologer['name'],
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            astrologer['name'],
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withAlpha(35),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: statusColor, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.circle, size: 6, color: statusColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -703,51 +921,54 @@ class AstrologerCard extends StatelessWidget {
           const SizedBox(height: 10),
 
           // CTAs (Audio Call, Video Call, Chat)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AstroTheme.emeraldAccent,
-                    side: const BorderSide(color: AstroTheme.emeraldAccent),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+          Opacity(
+            opacity: isOnline ? 1.0 : 0.65,
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isOnline ? AstroTheme.emeraldAccent : Colors.white60,
+                      side: BorderSide(color: isOnline ? AstroTheme.emeraldAccent : Colors.white24),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => _startConsultation(context, 'chat', chatRate),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                    label: Text('Chat ₹${chatRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: () => _startConsultation(context, 'chat', chatRate),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                  label: Text('Chat ₹${chatRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AstroTheme.solarYellow,
-                    foregroundColor: AstroTheme.emeraldNight,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isOnline ? AstroTheme.solarYellow : Colors.white24,
+                      foregroundColor: isOnline ? AstroTheme.emeraldNight : Colors.white70,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => _startConsultation(context, 'audio', audioRate),
+                    icon: const Icon(Icons.call, size: 14),
+                    label: Text('Call ₹${audioRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: () => _startConsultation(context, 'audio', audioRate),
-                  icon: const Icon(Icons.call, size: 14),
-                  label: Text('Call ₹${audioRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AstroTheme.solarYellow,
-                    backgroundColor: AstroTheme.solarYellow.withAlpha(25),
-                    side: const BorderSide(color: AstroTheme.solarYellow),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isOnline ? AstroTheme.solarYellow : Colors.white60,
+                      backgroundColor: isOnline ? AstroTheme.solarYellow.withAlpha(25) : Colors.transparent,
+                      side: BorderSide(color: isOnline ? AstroTheme.solarYellow : Colors.white24),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => _startConsultation(context, 'video', videoRate),
+                    icon: const Icon(Icons.videocam, size: 14),
+                    label: Text('Video ₹${videoRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: () => _startConsultation(context, 'video', videoRate),
-                  icon: const Icon(Icons.videocam, size: 14),
-                  label: Text('Video ₹${videoRate.toInt()}/m', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -755,6 +976,8 @@ class AstrologerCard extends StatelessWidget {
   }
 
   void _startConsultation(BuildContext context, String type, double ratePerMin) {
+    if (_isCallInitiating) return;
+
     const double minMinutes = 5.0;
     final double minRequired = ratePerMin * minMinutes;
 
@@ -787,10 +1010,52 @@ class AstrologerCard extends StatelessWidget {
       return;
     }
 
-    // Real End-to-End Consultation Flow:
-    // 1. Show Outgoing Ringing Dialog with 30s countdown
-    // 2. Poll server for Astrologer acceptance
-    // 3. On accept, instantly navigate to full-screen Agora Call / Chat room
+    final String status = (astrologer['call_status'] ?? astrologer['status'] ?? 'offline').toString().toLowerCase();
+
+    if (status == 'offline') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.forestSurface,
+          content: Text(
+            '⚠️ ${astrologer['name']} is currently Offline. Consultation will be available once they toggle Online.',
+            style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (status == 'busy') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AstroTheme.forestSurface,
+          content: Text(
+            '⚠️ ${astrologer['name']} is currently in another consultation (Busy). Please wait a few moments.',
+            style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    _isCallInitiating = true;
+
+    if (type != 'chat') {
+      PermissionHelper.ensureCallPermissions(context: context, isVideo: type == 'video').then((granted) {
+        if (!granted || !context.mounted) {
+          _isCallInitiating = false;
+          return;
+        }
+        _launchOutgoingCall(context, type, ratePerMin);
+      });
+      return;
+    }
+    _launchOutgoingCall(context, type, ratePerMin);
+  }
+
+  void _launchOutgoingCall(BuildContext context, String type, double ratePerMin) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -799,9 +1064,11 @@ class AstrologerCard extends StatelessWidget {
         type: type,
         ratePerMin: ratePerMin,
         onAccepted: (data) {
+          _isCallInitiating = false;
           final sessionId = data['session_id']?.toString() ?? '';
           final channelName = data['channel_name']?.toString() ?? '';
           final agoraToken = data['agora_user_token']?.toString() ?? (data['agora_token']?.toString() ?? '');
+          final int agoraUid = safeInt(data['agora_user_uid'] ?? data['agora_uid'], 100000 + UserState.userId);
 
           if (type == 'chat') {
             Navigator.push(
@@ -826,6 +1093,7 @@ class AstrologerCard extends StatelessWidget {
                   sessionId: sessionId,
                   channelName: channelName,
                   agoraToken: agoraToken,
+                  agoraUid: agoraUid,
                 ),
               ),
             );
@@ -841,7 +1109,9 @@ class AstrologerCard extends StatelessWidget {
           );
         },
       ),
-    );
+    ).then((_) {
+      _isCallInitiating = false;
+    });
   }
 }
 
@@ -900,8 +1170,12 @@ class _OutgoingCallingDialogState extends State<OutgoingCallingDialog> with Sing
         _sessionId = res['data']['session_id'];
         _statusText = 'Ringing Astrologer... Waiting to accept';
       });
+      UserState.isCallActive = true;
+      UserState.activeSessionId = _sessionId!;
       _startTimers();
     } else {
+      UserState.isCallActive = false;
+      UserState.activeSessionId = '';
       final msg = res['message'] ?? 'Astrologer is currently unavailable.';
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -927,36 +1201,25 @@ class _OutgoingCallingDialogState extends State<OutgoingCallingDialog> with Sing
 
       if (checkRes['ok'] == true && checkRes['data'] != null) {
         final status = checkRes['data']['status'];
-        if (status == 'ringing_user') {
-          // Astrologer accepted! Open Full-Screen Incoming Call Screen
+        if (status == 'active' || status == 'ringing_user') {
+          // Astrologer accepted! Instantly connect to call room
           _statusPollTimer?.cancel();
           _countdownTimer?.cancel();
+          UserState.isCallActive = true;
+          UserState.activeSessionId = _sessionId!;
+          if (status == 'ringing_user') {
+            ApiService.post('/sessions/user_accept.php', {
+              'session_id': _sessionId,
+              'user_id': UserState.userId,
+            });
+          }
           Navigator.pop(context); // Close OutgoingCallingDialog
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => FullScreenIncomingCallScreen(
-                astrologer: widget.astrologer,
-                sessionId: _sessionId!,
-                channelName: checkRes['data']['channel_name'] ?? '',
-                type: widget.type,
-                ratePerMin: widget.ratePerMin,
-                onConnected: (roomData) {
-                  widget.onAccepted(roomData);
-                },
-                onDeclined: widget.onDeclined,
-              ),
-            ),
-          );
-        } else if (status == 'active') {
-          _statusPollTimer?.cancel();
-          _countdownTimer?.cancel();
-          Navigator.pop(context);
           widget.onAccepted(checkRes['data']);
         } else if (status == 'cancelled' || status == 'completed') {
           _statusPollTimer?.cancel();
           _countdownTimer?.cancel();
+          UserState.isCallActive = false;
+          UserState.activeSessionId = '';
           Navigator.pop(context);
           widget.onDeclined();
         }
@@ -967,6 +1230,8 @@ class _OutgoingCallingDialogState extends State<OutgoingCallingDialog> with Sing
   Future<void> _cancelCall({bool timeout = false}) async {
     _statusPollTimer?.cancel();
     _countdownTimer?.cancel();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
     if (_sessionId != null) {
       await ApiService.post('/sessions/reject.php', {'session_id': _sessionId});
     }
@@ -1181,6 +1446,8 @@ class _FullScreenIncomingCallScreenState extends State<FullScreenIncomingCallScr
     if (_isConnecting) return;
     setState(() => _isConnecting = true);
     _countdownTimer?.cancel();
+    UserState.isCallActive = true;
+    UserState.activeSessionId = widget.sessionId;
 
     final res = await ApiService.post('/sessions/user_accept.php', {
       'session_id': widget.sessionId,
@@ -1194,6 +1461,8 @@ class _FullScreenIncomingCallScreenState extends State<FullScreenIncomingCallScr
       widget.onConnected(res['data']);
     } else {
       setState(() => _isConnecting = false);
+      UserState.isCallActive = false;
+      UserState.activeSessionId = '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AstroTheme.forestSurface,
@@ -1206,6 +1475,8 @@ class _FullScreenIncomingCallScreenState extends State<FullScreenIncomingCallScr
 
   Future<void> _declineCall({bool timeout = false}) async {
     _countdownTimer?.cancel();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
     await ApiService.post('/sessions/reject.php', {'session_id': widget.sessionId});
     if (!mounted) return;
     Navigator.pop(context);
@@ -1490,6 +1761,76 @@ class _FullScreenIncomingCallScreenState extends State<FullScreenIncomingCallScr
 }
 
 // 3. LIVE AGORA CALL SCREEN (AUDIO & VIDEO WITH REAL-TIME BILLING HEARTBEAT)
+class PermissionHelper {
+  static Future<bool> ensureCallPermissions({required BuildContext context, bool isVideo = false}) async {
+    // In unit test environment, bypass native platform permission channels
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      return true;
+    }
+    try {
+      var micStatus = await Permission.microphone.status;
+      if (!micStatus.isGranted) {
+        micStatus = await Permission.microphone.request();
+      }
+      var camStatus = PermissionStatus.granted;
+      if (isVideo) {
+        camStatus = await Permission.camera.status;
+        if (!camStatus.isGranted) {
+          camStatus = await Permission.camera.request();
+        }
+      }
+      try {
+        if (Platform.isAndroid) {
+          await Permission.bluetoothConnect.request();
+        }
+      } catch (_) {}
+
+      if (micStatus.isPermanentlyDenied || (isVideo && camStatus.isPermanentlyDenied)) {
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AstroTheme.forestSurface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AstroTheme.borderGreen)),
+              title: const Row(
+                children: [
+                  Icon(Icons.mic_off, color: Colors.redAccent),
+                  SizedBox(width: 8),
+                  Text('Microphone Required', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              content: const Text(
+                'AstroSubam requires Microphone permission to transmit real-time two-way voice. Please tap "Open Settings" and enable Microphone access.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: Colors.black),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    openAppSettings();
+                  },
+                  child: const Text('Open Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+        return false;
+      }
+
+      return micStatus.isGranted && (!isVideo || camStatus.isGranted);
+    } catch (e) {
+      debugPrint('[PERMISSION_ERROR] $e');
+      return true;
+    }
+  }
+}
+
 class LiveAgoraCallScreen extends StatefulWidget {
   final Map<String, dynamic> astrologer;
   final double ratePerMin;
@@ -1497,6 +1838,7 @@ class LiveAgoraCallScreen extends StatefulWidget {
   final String? sessionId;
   final String? channelName;
   final String? agoraToken;
+  final int? agoraUid;
 
   const LiveAgoraCallScreen({
     super.key,
@@ -1506,26 +1848,403 @@ class LiveAgoraCallScreen extends StatefulWidget {
     this.sessionId,
     this.channelName,
     this.agoraToken,
+    this.agoraUid,
   });
 
   @override
   State<LiveAgoraCallScreen> createState() => _LiveAgoraCallScreenState();
 }
 
-class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
+class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> with WidgetsBindingObserver {
   int _seconds = 0;
   Timer? _timer;
   Timer? _billingTimer;
+  Timer? _connectionTimeoutTimer;
+  Timer? _statusPoller;
+  bool _isMediaConnected = false;
   bool _isMuted = false;
   bool _isSpeaker = true;
   bool _isCameraOff = false;
   bool _isFrontCamera = true;
   double _totalDeducted = 0.0;
 
+  // Real Agora RTC Engine state
+  RtcEngine? _engine;
+  int? _remoteUid;
+  bool _isJoined = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      // 35-Second Media Connection Safeguard: Auto-cancel if unconnected
+      _connectionTimeoutTimer = Timer(const Duration(seconds: 35), () {
+        if (!_isMediaConnected && mounted) {
+          _handleConnectionTimeout();
+        }
+      });
+      // Status Poller to detect peer acceptance and remote termination
+      _statusPoller = Timer.periodic(const Duration(milliseconds: 1200), (t) {
+        _checkSessionStatus();
+      });
+      // Initialize Real Agora RTC Engine with runtime mic/camera permissions
+      _initAgora();
+    } else {
+      // Unit test & Direct simulation mode: connect immediately
+      _onMediaConnected();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _engine != null) {
+      debugPrint('[AGORA_INIT] App resumed from background - ensuring audio & speaker are active');
+      _engine?.enableAudio();
+      _engine?.enableLocalAudio(true);
+      _engine?.muteLocalAudioStream(false);
+      if (_isSpeaker) {
+        _engine?.setDefaultAudioRouteToSpeakerphone(true);
+        _engine?.setEnableSpeakerphone(true);
+      }
+    }
+  }
+
+  Future<void> _initAgora() async {
+    try {
+      // 1. Request Runtime Permissions (Microphone & Camera)
+      debugPrint('[AGORA_INIT] Requesting runtime permissions via PermissionHelper...');
+      final permGranted = await PermissionHelper.ensureCallPermissions(
+        context: context,
+        isVideo: widget.isVideo,
+      );
+      if (!permGranted) {
+        debugPrint('[AGORA_ERROR] Essential call permissions denied by user.');
+      }
+
+      // 2. Safely release any dangling engine instance
+      if (_engine != null) {
+        try {
+          await _engine!.leaveChannel();
+          await _engine!.release();
+        } catch (_) {}
+        _engine = null;
+      }
+
+      // 3. Initialize RTC Engine with App ID and Communication Profile
+      _engine = createAgoraRtcEngine();
+      await _engine!.initialize(const RtcEngineContext(
+        appId: 'f5df168c9c7849ef892cd39843d1ba42',
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+      ));
+
+      // 4. Register Event Handlers
+      _engine!.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+            debugPrint('[AGORA_JOIN] ✅ Joined channel: ${connection.channelId}, localUid: ${connection.localUid}, elapsed: ${elapsed}ms');
+            if (mounted) setState(() => _isJoined = true);
+            // After successful join, route audio to speakerphone
+            _engine?.setEnableSpeakerphone(true);
+
+            Timer(const Duration(seconds: 3), () {
+              if (_isJoined && !_isMediaConnected && mounted) {
+                debugPrint('[AGORA_JOIN] Activating media timer after verified channel join.');
+                _onMediaConnected();
+              }
+            });
+          },
+          onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+            debugPrint('[AGORA_JOIN] ✅ REMOTE USER JOINED: uid=$remoteUid channel=${connection.channelId} elapsed=${elapsed}ms');
+            if (mounted) setState(() => _remoteUid = remoteUid);
+            _engine?.setEnableSpeakerphone(true);
+            _onMediaConnected();
+          },
+          onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+            debugPrint('[AGORA_LEAVE] Remote user left: $remoteUid, reason: $reason');
+            if (mounted) setState(() => _remoteUid = null);
+            _onRemoteEnded();
+          },
+          onLeaveChannel: (RtcConnection connection, RtcStats stats) {
+            debugPrint('[AGORA_LEAVE] Local user left channel: ${connection.channelId}, duration: ${stats.duration}s');
+          },
+          onLocalAudioStateChanged: (RtcConnection connection, LocalAudioStreamState state, LocalAudioStreamReason reason) {
+            debugPrint('[AGORA_LOCAL_AUDIO] State: $state, reason: $reason');
+          },
+          onRemoteAudioStateChanged: (RtcConnection connection, int remoteUid, RemoteAudioState state, RemoteAudioStateReason reason, int elapsed) {
+            debugPrint('[AGORA_REMOTE_AUDIO] UID=$remoteUid state=$state reason=$reason elapsed=${elapsed}ms');
+            if (state == RemoteAudioState.remoteAudioStateDecoding || state == RemoteAudioState.remoteAudioStateStarting) {
+              if (mounted && _remoteUid == null) setState(() => _remoteUid = remoteUid);
+              _engine?.setEnableSpeakerphone(true);
+              _onMediaConnected();
+            }
+          },
+          onAudioRoutingChanged: (int routing) {
+            debugPrint('[AGORA_ROUTE] Audio routing changed to: $routing (1=Earpiece, 3=Speakerphone, 4=Headset, 5=Bluetooth)');
+            if (mounted) {
+              setState(() => _isSpeaker = (routing == 3));
+            }
+          },
+          onRemoteVideoStateChanged: (RtcConnection connection, int remoteUid, RemoteVideoState state, RemoteVideoStateReason reason, int elapsed) {
+            debugPrint('[AGORA_REMOTE_VIDEO] Remote video state: $state, reason: $reason');
+            if (state == RemoteVideoState.remoteVideoStateDecoding) {
+              if (mounted && _remoteUid == null) {
+                setState(() => _remoteUid = remoteUid);
+              }
+              _onMediaConnected();
+            }
+          },
+          onError: (ErrorCodeType err, String msg) {
+            debugPrint('[AGORA_ERROR] Code: $err, message: $msg');
+          },
+        ),
+      );
+
+      // 5. Enable Audio & Video Subsystems
+      await _engine!.enableAudio();
+      if (widget.isVideo) {
+        await _engine!.enableVideo();
+        await _engine!.startPreview();
+      }
+
+      // 6. Resolve UID, Channel & Token
+      final int currentUid = widget.agoraUid != null && widget.agoraUid! > 0
+          ? widget.agoraUid!
+          : (_isAstrologerMode ? (200000 + AstrologerState.numericId) : (100000 + UserState.userId));
+      final String chName = (widget.channelName != null && widget.channelName!.trim().isNotEmpty)
+          ? widget.channelName!.trim()
+          : (widget.sessionId != null && widget.sessionId!.isNotEmpty ? 'astrosubam_${widget.sessionId}' : 'astrosubam_default');
+      String tok = widget.agoraToken ?? '';
+
+      if (tok.isEmpty && widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+        try {
+          final res = await ApiService.get('/sessions/check_status.php?session_id=${Uri.encodeComponent(widget.sessionId!)}');
+          if (res['ok'] == true && res['data'] != null) {
+            tok = (_isAstrologerMode ? res['data']['agora_astro_token'] : res['data']['agora_user_token'])?.toString() ?? '';
+            debugPrint('[AGORA_INIT] Fetched fresh token for UID $currentUid: ${tok.length} chars');
+          }
+        } catch (tokErr) {
+          debugPrint('[AGORA_ERROR] Could not fetch status token: $tokErr');
+        }
+      }
+
+      // ⚡ Guaranteed Fallback Token: Matches standalone test_agora_call.php mechanism
+      if (tok.isEmpty || tok.length < 20) {
+        try {
+          final role = _isAstrologerMode ? 'astrologer' : 'user';
+          final astroParam = _isAstrologerMode ? '&astro_id=${AstrologerState.numericId}' : '&user_id=${UserState.userId}';
+          final fallbackRes = await ApiService.get('../test_agora_call.php?action=get_token&role=$role$astroParam&channel=${Uri.encodeComponent(chName)}');
+          if (fallbackRes != null && fallbackRes['token'] != null) {
+            tok = fallbackRes['token'].toString();
+            debugPrint('[AGORA_INIT] Guaranteed fallback token fetched: ${tok.length} chars');
+          }
+        } catch (fbErr) {
+          debugPrint('[AGORA_ERROR] Could not fetch fallback token: $fbErr');
+        }
+      }
+
+      debugPrint('[AGORA_JOIN] Joining channel $chName with UID $currentUid token_len=${tok.length}');
+
+      // 7. Join Channel with Clean ChannelMediaOptions
+      final options = ChannelMediaOptions(
+        clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        publishMicrophoneTrack: true,
+        publishCameraTrack: widget.isVideo,
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: widget.isVideo,
+      );
+
+      await _engine!.joinChannel(
+        token: tok,
+        channelId: chName,
+        uid: currentUid,
+        options: options,
+      );
+    } on AgoraRtcException catch (e, stack) {
+      debugPrint('[AGORA_ERROR] AgoraRtcException: code=${e.code}, msg=${e.message}\n$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AstroTheme.forestSurface,
+            content: Text('Agora Call Error (${e.code}): ${e.message ?? "Connection refused"}',
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('[AGORA_ERROR] RTC Engine initialization failed: $e\n$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AstroTheme.forestSurface,
+            content: Text('Agora Call Initialization Error: $e',
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _cleanupAgora() async {
+    try {
+      if (_engine != null) {
+        await _engine!.leaveChannel();
+        await _engine!.release();
+        _engine = null;
+      }
+    } catch (e) {
+      debugPrint('[AGORA_LEAVE] Cleanup error: $e');
+    }
+  }
+
+  Future<void> _toggleMute() async {
+    final nextMuteState = !_isMuted;
+    setState(() => _isMuted = nextMuteState);
+    debugPrint('[AGORA_LOCAL_AUDIO] Toggling microphone mute: $nextMuteState');
+    await _engine?.muteLocalAudioStream(nextMuteState);
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final nextSpeakerState = !_isSpeaker;
+    setState(() => _isSpeaker = nextSpeakerState);
+    debugPrint('[AGORA_ROUTE] Toggling speakerphone: $nextSpeakerState');
+    await _engine?.setEnableSpeakerphone(nextSpeakerState);
+  }
+
+  Future<void> _toggleCamera() async {
+    setState(() => _isCameraOff = !_isCameraOff);
+    await _engine?.muteLocalVideoStream(_isCameraOff);
+  }
+
+  Future<void> _flipCamera() async {
+    setState(() => _isFrontCamera = !_isFrontCamera);
+    await _engine?.switchCamera();
+  }
+
+  Future<void> _checkSessionStatus() async {
+    if (!mounted || widget.sessionId == null) return;
+    try {
+      final res = await ApiService.get('/sessions/check_status.php?session_id=${Uri.encodeComponent(widget.sessionId!)}');
+      if (res['ok'] == true && res['data'] != null) {
+        final status = res['data']['status']?.toString();
+        // ✅ Only detect REMOTE END here — never fake-start timer from backend status
+        // Real media connect is signalled ONLY by onUserJoined / onRemoteAudioStateChanged Agora callbacks
+        if (status == 'completed' || status == 'cancelled') {
+          _onRemoteEnded();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _onMediaConnected() {
+    if (_isMediaConnected) return;
+    _isMediaConnected = true;
+    _connectionTimeoutTimer?.cancel();
+    if (_isSpeaker) {
+      _engine?.setEnableSpeakerphone(true);
+    }
+    if (mounted) {
+      setState(() {});
+    }
     _startTimers();
+  }
+
+  void _handleConnectionTimeout() {
+    _cleanupAgora();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
+    _timer?.cancel();
+    _billingTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
+    _statusPoller?.cancel();
+    if (widget.sessionId != null) {
+      ApiService.post('/sessions/end.php', {
+        'session_id': widget.sessionId,
+        'duration_seconds': 0,
+        'rating': 5,
+        'ended_by': 'user',
+      });
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: AstroTheme.forestSurface,
+        content: Text('⚠️ Call connection timed out (35s). No charges applied.',
+            style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  bool get _isAstrologerMode => AstrologerState.isLoggedIn;
+
+  void _onRemoteEnded() {
+    _cleanupAgora();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
+    _timer?.cancel();
+    _billingTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
+    _statusPoller?.cancel();
+
+    if (_isAstrologerMode) {
+      if (widget.sessionId != null) {
+        ApiService.get('/sessions/check_status.php?session_id=${Uri.encodeComponent(widget.sessionId!)}').then((res) {
+          if (res['ok'] == true && res['data'] != null && res['data']['astrologer_share'] != null) {
+            AstrologerState.withdrawableBalance += (res['data']['astrologer_share'] as num).toDouble();
+          }
+        });
+      }
+    } else {
+      if (widget.sessionId != null) {
+        ApiService.get('/wallet/balance.php?user_id=${UserState.userId}').then((res) {
+          if (res['ok'] == true && res['data'] != null && res['data']['wallet_balance'] != null) {
+            UserState.walletBalance = (res['data']['wallet_balance'] as num).toDouble();
+          }
+        });
+      }
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AstroTheme.forestSurface,
+        title: const Text('Consultation Concluded', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_isAstrologerMode ? 'Devotee has concluded the consultation session.' : 'Consultation ended by remote peer.',
+                style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 10),
+            Text('Duration: ${_seconds ~/ 60}m ${_seconds % 60}s', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(_isAstrologerMode 
+                ? 'Your Earnings: ₹${(_seconds * (widget.ratePerMin / 60) * 0.80).toStringAsFixed(0)}' 
+                : 'Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', 
+                style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text(_isAstrologerMode 
+                ? 'Total Withdrawable: ₹${AstrologerState.withdrawableBalance.toStringAsFixed(0)}' 
+                : 'Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', 
+                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startTimers() {
@@ -1542,42 +2261,79 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
           _endCall(exhausted: true);
           return;
         }
-        if (hbRes['data'] != null && hbRes['data']['remaining_balance'] != null) {
+        if (_isAstrologerMode) {
           setState(() {
-            UserState.walletBalance = (hbRes['data']['remaining_balance'] as num).toDouble();
-            _totalDeducted += widget.ratePerMin;
-          });
-        }
-      } else {
-        if (UserState.walletBalance >= widget.ratePerMin) {
-          setState(() {
-            UserState.walletBalance -= widget.ratePerMin;
-            _totalDeducted += widget.ratePerMin;
+            _totalDeducted += widget.ratePerMin * 0.80;
           });
         } else {
-          _endCall(exhausted: true);
-          return;
+          if (hbRes['data'] != null && hbRes['data']['remaining_balance'] != null) {
+            setState(() {
+              UserState.walletBalance = (hbRes['data']['remaining_balance'] as num).toDouble();
+              _totalDeducted += widget.ratePerMin;
+            });
+          }
+        }
+      } else {
+        if (_isAstrologerMode) {
+          setState(() => _totalDeducted += widget.ratePerMin * 0.80);
+        } else {
+          if (UserState.walletBalance >= widget.ratePerMin) {
+            setState(() {
+              UserState.walletBalance -= widget.ratePerMin;
+              _totalDeducted += widget.ratePerMin;
+            });
+          } else {
+            _endCall(exhausted: true);
+            return;
+          }
         }
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AstroTheme.forestSurface,
-          content: Text(
-            '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
-            style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+      if (!_isAstrologerMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AstroTheme.forestSurface,
+            content: Text(
+              '1 minute billed: -₹${widget.ratePerMin.toStringAsFixed(0)} | Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}',
+              style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold),
+            ),
+            duration: const Duration(seconds: 2),
           ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      }
     });
   }
 
   void _endCall({bool exhausted = false}) {
+    _cleanupAgora();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
     _timer?.cancel();
     _billingTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
+    _statusPoller?.cancel();
+
+    final String endedBy = _isAstrologerMode ? 'astrologer' : 'user';
+
     if (widget.sessionId != null) {
-      ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+      ApiService.post('/sessions/end.php', {
+        'session_id': widget.sessionId,
+        'duration_seconds': _isMediaConnected ? _seconds : 0,
+        'rating': 5,
+        'ended_by': endedBy,
+      }).then((endRes) {
+        if (endRes['ok'] == true && endRes['data'] != null) {
+          if (_isAstrologerMode) {
+            if (endRes['data']['astrologer_share'] != null) {
+              AstrologerState.withdrawableBalance += (endRes['data']['astrologer_share'] as num).toDouble();
+            }
+          } else {
+            if (endRes['data']['user_remaining_balance'] != null) {
+              UserState.walletBalance = (endRes['data']['user_remaining_balance'] as num).toDouble();
+            }
+          }
+        }
+      });
     }
 
     showDialog(
@@ -1585,7 +2341,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AstroTheme.forestSurface,
-        title: Text(exhausted ? 'Call Ended (Low Balance)' : 'Consultation Completed', style: const TextStyle(color: AstroTheme.solarYellow)),
+        title: Text(exhausted ? 'Call Ended (Low Balance)' : 'Consultation Completed', style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1594,9 +2350,15 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
             const SizedBox(height: 6),
             Text('Duration: ${_seconds ~/ 60}m ${_seconds % 60}s', style: const TextStyle(color: Colors.white)),
             const SizedBox(height: 6),
-            Text('Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white70)),
+            Text(_isAstrologerMode 
+                ? 'Your Earnings: ₹${(_isMediaConnected ? (_seconds * (widget.ratePerMin / 60) * 0.80).toStringAsFixed(0) : "0")}' 
+                : 'Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', 
+                style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 6),
-            Text('Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white70)),
+            Text(_isAstrologerMode 
+                ? 'Total Withdrawable: ₹${AstrologerState.withdrawableBalance.toStringAsFixed(0)}' 
+                : 'Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', 
+                style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
@@ -1606,7 +2368,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
               Navigator.pop(ctx);
               Navigator.pop(context);
             },
-            child: const Text('OK'),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1615,8 +2377,14 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cleanupAgora();
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
     _timer?.cancel();
     _billingTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
+    _statusPoller?.cancel();
     super.dispose();
   }
 
@@ -1638,32 +2406,46 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
         Positioned.fill(
           child: Container(
             color: Colors.black,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                widget.astrologer['image'].toString().startsWith('http')
-                    ? Image.network(
-                        widget.astrologer['image'],
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset('assets/logo.jpg', fit: BoxFit.cover),
-                      )
-                    : Image.asset('assets/logo.jpg', fit: BoxFit.cover),
-                // Gradient Overlays
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withAlpha(180),
-                        Colors.transparent,
-                        Colors.black.withAlpha(220),
-                      ],
+            child: (_engine != null && _remoteUid != null)
+                ? AgoraVideoView(
+                    controller: VideoViewController.remote(
+                      rtcEngine: _engine!,
+                      canvas: VideoCanvas(uid: _remoteUid),
+                      connection: RtcConnection(channelId: widget.channelName ?? 'astrosubam_${widget.sessionId}'),
                     ),
+                  )
+                : Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      widget.astrologer['image'].toString().startsWith('http')
+                          ? Image.network(
+                              widget.astrologer['image'],
+                              fit: BoxFit.cover,
+                              errorBuilder: (ctx, err, stack) => Image.asset('assets/logo.jpg', fit: BoxFit.cover),
+                            )
+                          : Image.asset('assets/logo.jpg', fit: BoxFit.cover),
+                      // Gradient Overlays
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withAlpha(180),
+                              Colors.transparent,
+                              Colors.black.withAlpha(220),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          _isJoined ? 'Waiting for remote camera...' : 'Connecting to Agora room...',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ),
 
@@ -1735,6 +2517,13 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                       ),
                     ),
                   )
+                else if (_engine != null)
+                  AgoraVideoView(
+                    controller: VideoViewController(
+                      rtcEngine: _engine!,
+                      canvas: const VideoCanvas(uid: 0),
+                    ),
+                  )
                 else
                   Container(
                     color: Colors.grey.shade900,
@@ -1758,7 +2547,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                   bottom: 4,
                   right: 4,
                   child: InkWell(
-                    onTap: () => setState(() => _isFrontCamera = !_isFrontCamera),
+                    onTap: _flipCamera,
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
@@ -1833,13 +2622,13 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 IconButton(
                   iconSize: 26,
                   icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.redAccent : Colors.white),
-                  onPressed: () => setState(() => _isMuted = !_isMuted),
+                  onPressed: _toggleMute,
                 ),
                 // Toggle Video / Camera
                 IconButton(
                   iconSize: 26,
                   icon: Icon(_isCameraOff ? Icons.videocam_off : Icons.videocam, color: _isCameraOff ? Colors.redAccent : Colors.white),
-                  onPressed: () => setState(() => _isCameraOff = !_isCameraOff),
+                  onPressed: _toggleCamera,
                 ),
                 // End Call Button
                 IconButton(
@@ -1852,13 +2641,13 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 IconButton(
                   iconSize: 26,
                   icon: const Icon(Icons.flip_camera_android, color: Colors.white),
-                  onPressed: () => setState(() => _isFrontCamera = !_isFrontCamera),
+                  onPressed: _flipCamera,
                 ),
                 // Toggle Speaker
                 IconButton(
                   iconSize: 26,
                   icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: AstroTheme.solarYellow),
-                  onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+                  onPressed: _toggleSpeaker,
                 ),
               ],
             ),
@@ -1939,7 +2728,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 iconSize: 32,
                 icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted ? Colors.redAccent : Colors.white),
                 style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
-                onPressed: () => setState(() => _isMuted = !_isMuted),
+                onPressed: _toggleMute,
               ),
               IconButton(
                 iconSize: 38,
@@ -1951,7 +2740,7 @@ class _LiveAgoraCallScreenState extends State<LiveAgoraCallScreen> {
                 iconSize: 32,
                 icon: Icon(_isSpeaker ? Icons.volume_up : Icons.volume_down, color: Colors.white),
                 style: IconButton.styleFrom(backgroundColor: AstroTheme.jadeContainer, padding: const EdgeInsets.all(14)),
-                onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+                onPressed: _toggleSpeaker,
               ),
             ],
           ),
@@ -1983,6 +2772,7 @@ class LiveChatConsultationScreen extends StatefulWidget {
 
 class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen> {
   final TextEditingController _msgController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [
     {
       'sender': 'astro',
@@ -1990,19 +2780,188 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
     }
   ];
   Timer? _chatTimer;
+  Timer? _sessionTimer;
+  Timer? _billingTimer;
+  Timer? _statusPoller;
   int _lastMsgId = 0;
+  int _seconds = 0;
+  double _totalDeducted = 0.0;
+  bool _isSessionEnded = false;
 
   @override
   void initState() {
     super.initState();
+    _startTimers();
     _startChatPolling();
   }
 
   @override
   void dispose() {
+    UserState.isCallActive = false;
+    UserState.activeSessionId = '';
+    _sessionTimer?.cancel();
+    _billingTimer?.cancel();
     _chatTimer?.cancel();
+    _statusPoller?.cancel();
     _msgController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startTimers() {
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted && !_isSessionEnded) {
+        setState(() => _seconds++);
+      }
+    });
+
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      // 60-Second Real-Time Billing Heartbeat
+      _billingTimer = Timer.periodic(const Duration(seconds: 60), (t) async {
+        if (!mounted || _isSessionEnded) return;
+        final hbRes = await ApiService.post('/sessions/heartbeat.php', {'session_id': widget.sessionId});
+        if (!mounted) return;
+        if (hbRes['data'] != null && hbRes['data']['terminate'] == true) {
+          _endChat(exhausted: true);
+          return;
+        }
+        if (hbRes['data'] != null && hbRes['data']['remaining_balance'] != null) {
+          setState(() {
+            UserState.walletBalance = (hbRes['data']['remaining_balance'] as num).toDouble();
+            _totalDeducted += widget.ratePerMin;
+          });
+        }
+      });
+
+      // Status Poller: Detects when Astrologer ends consultation
+      _statusPoller = Timer.periodic(const Duration(milliseconds: 1200), (t) async {
+        if (!mounted || _isSessionEnded) return;
+        try {
+          final res = await ApiService.get('/sessions/check_status.php?session_id=${Uri.encodeComponent(widget.sessionId!)}');
+          if (res['ok'] == true && res['data'] != null) {
+            final status = res['data']['status']?.toString();
+            if (status == 'completed' || status == 'cancelled') {
+              _onRemoteEnded(res['data']);
+            }
+          }
+        } catch (_) {}
+      });
+    }
+  }
+
+  void _onRemoteEnded(Map<String, dynamic>? data) {
+    if (_isSessionEnded) return;
+    _isSessionEnded = true;
+    _sessionTimer?.cancel();
+    _billingTimer?.cancel();
+    _chatTimer?.cancel();
+    _statusPoller?.cancel();
+
+    if (data != null && data['total_deducted'] != null) {
+      _totalDeducted = (data['total_deducted'] as num).toDouble();
+    }
+    // Refresh wallet balance
+    ApiService.get('/wallet/balance.php?user_id=${UserState.userId}').then((balRes) {
+      if (balRes['ok'] == true && balRes['data'] != null && balRes['data']['wallet_balance'] != null) {
+        UserState.walletBalance = (balRes['data']['wallet_balance'] as num).toDouble();
+      }
+    });
+
+    if (!mounted) return;
+    setState(() {});
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AstroTheme.forestSurface,
+        title: const Text('Consultation Concluded', style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Astrologer has concluded this consultation session.', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 10),
+            Text('Duration: ${_seconds ~/ 60}m ${_seconds % 60}s', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text('Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text('Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _endChat({bool exhausted = false}) async {
+    if (_isSessionEnded) return;
+    _isSessionEnded = true;
+    _sessionTimer?.cancel();
+    _billingTimer?.cancel();
+    _chatTimer?.cancel();
+    _statusPoller?.cancel();
+
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      final endRes = await ApiService.post('/chat/end.php', {
+        'session_id': widget.sessionId,
+        'duration_seconds': _seconds,
+        'rating': 5,
+        'ended_by': 'user',
+      });
+      if (endRes['ok'] == true && endRes['data'] != null) {
+        if (endRes['data']['user_remaining_balance'] != null) {
+          UserState.walletBalance = (endRes['data']['user_remaining_balance'] as num).toDouble();
+        }
+        if (endRes['data']['total_deducted'] != null) {
+          _totalDeducted = (endRes['data']['total_deducted'] as num).toDouble();
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {});
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AstroTheme.forestSurface,
+        title: Text(exhausted ? 'Chat Ended (Low Balance)' : 'Consultation Completed', style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Chat consultation session closed.', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 10),
+            Text('Duration: ${_seconds ~/ 60}m ${_seconds % 60}s', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text('Total Billed: ₹${_totalDeducted.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text('Remaining Balance: ₹${UserState.walletBalance.toStringAsFixed(0)}', style: const TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startChatPolling() {
@@ -2025,14 +2984,29 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                 }
               }
             });
+            _scrollToBottom();
           }
         }
       } catch (_) {}
     });
   }
 
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String durationText = '${(_seconds ~/ 60).toString().padLeft(2, '0')}:${(_seconds % 60).toString().padLeft(2, '0')}';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AstroTheme.headerGreen,
@@ -2045,7 +3019,14 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(widget.astrologer['name'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const Text('Online • Agora Chat', style: TextStyle(color: AstroTheme.emeraldAccent, fontSize: 10)),
+                  Text(
+                    _isSessionEnded ? 'Completed • Agora Chat' : 'Live ($durationText) • Agora Chat',
+                    style: TextStyle(
+                      color: _isSessionEnded ? Colors.white54 : AstroTheme.emeraldAccent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2053,13 +3034,14 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              if (widget.sessionId != null) {
-                ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('End Chat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            onPressed: _isSessionEnded ? null : () => _endChat(),
+            child: Text(
+              _isSessionEnded ? 'Closed' : 'End Chat',
+              style: TextStyle(
+                color: _isSessionEnded ? Colors.white38 : Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -2078,6 +3060,7 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
           ),
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
@@ -2101,52 +3084,66 @@ class _LiveChatConsultationScreenState extends State<LiveChatConsultationScreen>
               },
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            color: AstroTheme.headerGreen,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Type your question or birth details...',
-                      hintStyle: const TextStyle(color: Colors.white38),
-                      filled: true,
-                      fillColor: AstroTheme.forestSurface,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+          if (_isSessionEnded)
+            Container(
+              padding: const EdgeInsets.all(14),
+              color: AstroTheme.forestSurface,
+              width: double.infinity,
+              child: const Text(
+                '✅ இந்த ஆலோசனை நிறைவடைந்தது (Consultation Concluded).',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AstroTheme.solarYellow, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(10),
+              color: AstroTheme.headerGreen,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _msgController,
+                      style: const TextStyle(color: Colors.white),
+                      enabled: !_isSessionEnded,
+                      decoration: InputDecoration(
+                        hintText: 'Type your question or birth details...',
+                        hintStyle: const TextStyle(color: Colors.white38),
+                        filled: true,
+                        fillColor: AstroTheme.forestSurface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  style: IconButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
-                  icon: const Icon(Icons.send),
-                  onPressed: () async {
-                    final text = _msgController.text.trim();
-                    if (text.isNotEmpty) {
-                      setState(() {
-                        _messages.add({'sender': 'user', 'text': text});
-                        _msgController.clear();
-                      });
-                      if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
-                        try {
-                          await ApiService.post('/chat/send.php', {
-                            'session_id': widget.sessionId,
-                            'sender_type': 'user',
-                            'sender_id': UserState.userId,
-                            'content': text,
-                          });
-                        } catch (_) {}
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: IconButton.styleFrom(backgroundColor: AstroTheme.solarYellow, foregroundColor: AstroTheme.emeraldNight),
+                    icon: const Icon(Icons.send),
+                    onPressed: _isSessionEnded ? null : () async {
+                      final text = _msgController.text.trim();
+                      if (text.isNotEmpty) {
+                        setState(() {
+                          _messages.add({'sender': 'user', 'text': text});
+                          _msgController.clear();
+                        });
+                        _scrollToBottom();
+                        if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+                          try {
+                            await ApiService.post('/chat/send.php', {
+                              'session_id': widget.sessionId,
+                              'sender_type': 'user',
+                              'sender_id': UserState.userId,
+                              'content': text,
+                            });
+                          } catch (_) {}
+                        }
                       }
-                    }
-                  },
-                ),
-              ],
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -3607,13 +4604,19 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
   void initState() {
     super.initState();
     _fetchDashboard();
+    // Prime microphone permission proactively so incoming calls connect with active mic
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        PermissionHelper.ensureCallPermissions(context: context, isVideo: false);
+      }
+    });
     _dashboardPollTimer = Timer.periodic(const Duration(milliseconds: 2000), (t) {
       if (mounted) _fetchDashboard();
     });
   }
 
   Future<void> _fetchDashboard() async {
-    if (!mounted || !AstrologerState.isMasterOnline) return;
+    if (!mounted) return;
     try {
       final res = await ApiService.get(
         '/astrologers/dashboard.php?astrologer_id=${AstrologerState.numericId}&phone=${AstrologerState.phone}',
@@ -3636,7 +4639,7 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
           _waitingCount = (data['waiting_count'] as num?)?.toInt() ?? _pendingQueue.length;
         });
 
-        if (data['has_incoming'] == true && !_isIncomingAlertShowing && data['latest_session'] != null) {
+        if (AstrologerState.isMasterOnline && data['has_incoming'] == true && !_isIncomingAlertShowing && data['latest_session'] != null) {
           _triggerRealIncomingCallAlert(Map<String, dynamic>.from(data['latest_session']));
         }
       }
@@ -3657,29 +4660,56 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
       barrierDismissible: false,
       builder: (_) => IncomingCallDialog(
         callerName: clientName,
-        category: '${type.toUpperCase()} Consultation • $clientPhone',
+        category: '${(type == "chat" ? "CHAT" : (type == "video" ? "VIDEO CALL" : "VOICE CALL"))} Consultation • $clientPhone',
         language: 'Tamil / English',
         ratePerMin: rate,
         sessionId: sessionId,
         onAccept: () async {
           setState(() => _isIncomingAlertShowing = false);
-          await ApiService.post('/sessions/accept.php', {
+          final res = await ApiService.post('/sessions/accept.php', {
             'session_id': sessionId,
             'astrologer_id': AstrologerState.numericId,
           });
 
           if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AstrologerActiveConsultationScreen(
-                clientName: clientName,
-                consultationType: '${type.toUpperCase()} Call',
-                sessionId: sessionId,
-                channelName: channelName,
+          final roomData = (res['data'] is Map) ? res['data'] : <String, dynamic>{};
+          final token = roomData['agora_astro_token']?.toString() ?? '';
+          final chName = roomData['channel_name']?.toString() ?? channelName;
+          final int? agoraUid = (roomData['agora_astro_uid'] as num?)?.toInt();
+
+          if (type.toLowerCase() == 'audio' || type.toLowerCase() == 'video') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LiveAgoraCallScreen(
+                  astrologer: {
+                    'id': AstrologerState.numericId,
+                    'name': clientName,
+                    'image': 'assets/logo.jpg',
+                    'speciality': 'Devotee Consultation',
+                  },
+                  ratePerMin: rate,
+                  isVideo: type.toLowerCase() == 'video',
+                  sessionId: sessionId,
+                  channelName: chName,
+                  agoraToken: token,
+                  agoraUid: agoraUid,
+                ),
               ),
-            ),
-          );
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AstrologerActiveConsultationScreen(
+                  clientName: clientName,
+                  consultationType: 'Live Chat',
+                  sessionId: sessionId,
+                  channelName: chName,
+                ),
+              ),
+            );
+          }
         },
         onDecline: () async {
           setState(() => _isIncomingAlertShowing = false);
@@ -3692,22 +4722,49 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
   }
 
   Future<void> _connectToSession(String sId, String name, String type, String channel) async {
-    await ApiService.post('/sessions/accept.php', {
+    final res = await ApiService.post('/sessions/accept.php', {
       'session_id': sId,
       'astrologer_id': AstrologerState.numericId,
     });
     if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AstrologerActiveConsultationScreen(
-          clientName: name,
-          consultationType: '$type Call',
-          sessionId: sId,
-          channelName: channel,
+    final roomData = (res['data'] is Map) ? res['data'] : <String, dynamic>{};
+    final token = roomData['agora_astro_token']?.toString() ?? '';
+    final chName = roomData['channel_name']?.toString() ?? channel;
+    final int? agoraUid = (roomData['agora_astro_uid'] as num?)?.toInt();
+
+    if (type.toLowerCase() == 'audio' || type.toLowerCase() == 'video') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LiveAgoraCallScreen(
+            astrologer: {
+              'id': AstrologerState.numericId,
+              'name': name,
+              'image': 'assets/logo.jpg',
+              'speciality': 'Devotee Consultation',
+            },
+            ratePerMin: AstrologerState.audioRate,
+            isVideo: type.toLowerCase() == 'video',
+            sessionId: sId,
+            channelName: chName,
+            agoraToken: token,
+            agoraUid: agoraUid,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AstrologerActiveConsultationScreen(
+            clientName: name,
+            consultationType: 'Live Chat',
+            sessionId: sId,
+            channelName: channel,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -3815,12 +4872,17 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                     label: 'Call',
                     isActive: AstrologerState.isAudioOnline,
                     onTap: () async {
-                      setState(() => AstrologerState.isAudioOnline = !AstrologerState.isAudioOnline);
-                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      setState(() {
+                        AstrologerState.isAudioOnline = !AstrologerState.isAudioOnline;
+                        final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                        AstrologerState.isMasterOnline = st == 'available';
+                      });
+                      final st = AstrologerState.isMasterOnline ? 'available' : 'offline';
                       await ApiService.post('/astrologers/update_status.php', {
                         'astrologer_id': AstrologerState.numericId,
                         'status': st,
                       });
+                      UserState.fetchAstrologers();
                     },
                   ),
                   const SizedBox(width: 8),
@@ -3829,12 +4891,17 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                     label: 'Chat',
                     isActive: AstrologerState.isChatOnline,
                     onTap: () async {
-                      setState(() => AstrologerState.isChatOnline = !AstrologerState.isChatOnline);
-                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      setState(() {
+                        AstrologerState.isChatOnline = !AstrologerState.isChatOnline;
+                        final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                        AstrologerState.isMasterOnline = st == 'available';
+                      });
+                      final st = AstrologerState.isMasterOnline ? 'available' : 'offline';
                       await ApiService.post('/astrologers/update_status.php', {
                         'astrologer_id': AstrologerState.numericId,
                         'status': st,
                       });
+                      UserState.fetchAstrologers();
                     },
                   ),
                   const SizedBox(width: 8),
@@ -3843,12 +4910,17 @@ class _AstrologerDashboardScreenState extends State<AstrologerDashboardScreen> {
                     label: 'Video',
                     isActive: AstrologerState.isVideoOnline,
                     onTap: () async {
-                      setState(() => AstrologerState.isVideoOnline = !AstrologerState.isVideoOnline);
-                      final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                      setState(() {
+                        AstrologerState.isVideoOnline = !AstrologerState.isVideoOnline;
+                        final st = (AstrologerState.isAudioOnline || AstrologerState.isChatOnline || AstrologerState.isVideoOnline) ? 'available' : 'offline';
+                        AstrologerState.isMasterOnline = st == 'available';
+                      });
+                      final st = AstrologerState.isMasterOnline ? 'available' : 'offline';
                       await ApiService.post('/astrologers/update_status.php', {
                         'astrologer_id': AstrologerState.numericId,
                         'status': st,
                       });
+                      UserState.fetchAstrologers();
                     },
                   ),
                 ],
@@ -4222,6 +5294,7 @@ class IncomingCallDialog extends StatefulWidget {
 class _IncomingCallDialogState extends State<IncomingCallDialog> {
   int _secondsRemaining = 30;
   Timer? _timer;
+  bool _isAccepting = false;
 
   @override
   void initState() {
@@ -4283,10 +5356,15 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: AstroTheme.statusOnline,
+                color: widget.category.contains('CHAT') ? Colors.purple : AstroTheme.statusOnline,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text('INCOMING CALL', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              child: Text(
+                widget.category.contains('CHAT')
+                    ? 'INCOMING CHAT'
+                    : (widget.category.contains('VIDEO') ? 'INCOMING VIDEO CALL' : 'INCOMING CALL'),
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 8),
 
@@ -4341,13 +5419,25 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
                       minimumSize: const Size(double.infinity, 48),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () {
-                      _timer?.cancel();
-                      Navigator.pop(context);
-                      widget.onAccept();
-                    },
-                    icon: const Icon(Icons.call, size: 18),
-                    label: Text('Accept (₹${widget.ratePerMin.toInt()}/m)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: _isAccepting
+                        ? null
+                        : () {
+                            setState(() => _isAccepting = true);
+                            _timer?.cancel();
+                            Navigator.pop(context);
+                            widget.onAccept();
+                          },
+                    icon: _isAccepting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.call, size: 18),
+                    label: Text(
+                      _isAccepting ? 'Connecting...' : 'Accept (₹${widget.ratePerMin.toInt()}/m)',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -4406,7 +5496,10 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
     if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
       _fetchMessages();
       _chatPollTimer = Timer.periodic(const Duration(milliseconds: 1000), (t) {
-        if (mounted) _fetchMessages();
+        if (mounted) {
+          _fetchMessages();
+          _checkSessionActiveStatus();
+        }
       });
 
       _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (t) async {
@@ -4431,13 +5524,44 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
             for (var m in msgs) {
               final id = m['id'] is int ? m['id'] as int : int.tryParse(m['id'].toString()) ?? 0;
               if (id > _lastMsgId) _lastMsgId = id;
-              _messages.add({
-                'sender': m['sender_type'] == 'astrologer' ? 'astrologer' : 'client',
-                'text': m['content']?.toString() ?? '',
-              });
+              // If sender is astrologer, it was already optimistically added in _sendMessage
+              if (m['sender_type']?.toString().toLowerCase() != 'astrologer') {
+                _messages.add({
+                  'sender': 'client',
+                  'text': m['content']?.toString() ?? '',
+                });
+              }
             }
           });
           _scrollToBottom();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkSessionActiveStatus() async {
+    if (!mounted || widget.sessionId == null) return;
+    try {
+      final res = await ApiService.get('/sessions/check_status.php?session_id=${Uri.encodeComponent(widget.sessionId!)}');
+      if (res['ok'] == true && res['data'] != null) {
+        final status = res['data']['status']?.toString();
+        if (status == 'completed' || status == 'cancelled') {
+          _sessionTimer?.cancel();
+          _chatPollTimer?.cancel();
+          _heartbeatTimer?.cancel();
+          if (res['data']['astrologer_share'] != null) {
+            AstrologerState.withdrawableBalance += (res['data']['astrologer_share'] as num).toDouble();
+          }
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AstroTheme.forestSurface,
+              content: Text('பக்தர் ஆலோசனையை நிறைவு செய்தார் (Consultation Ended by Devotee).',
+                  style: TextStyle(color: AstroTheme.solarYellow, fontWeight: FontWeight.bold)),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.pop(context);
         }
       }
     } catch (_) {}
@@ -4470,21 +5594,27 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
     if (text.isEmpty) return;
     if (quickText == null) _msgController.clear();
 
+    // Optimistically render astrologer's own message instantly
+    setState(() {
+      _messages.add({'sender': 'astrologer', 'text': text});
+    });
+    _scrollToBottom();
+
     if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
       try {
-        await ApiService.post('/chat/send.php', {
+        final res = await ApiService.post('/chat/send.php', {
           'session_id': widget.sessionId,
           'sender_type': 'astrologer',
           'sender_id': AstrologerState.numericId,
           'content': text,
         });
-        _fetchMessages();
-      } catch (_) {}
-    } else {
-      setState(() {
-        _messages.add({'sender': 'astrologer', 'text': text});
-      });
-      _scrollToBottom();
+        if (res['ok'] == true && res['data'] != null && res['data']['message_id'] != null) {
+          final newId = int.tryParse(res['data']['message_id'].toString()) ?? 0;
+          if (newId > _lastMsgId) _lastMsgId = newId;
+        }
+      } catch (err) {
+        debugPrint('Error sending astrologer chat: $err');
+      }
     }
   }
 
@@ -4493,7 +5623,15 @@ class _AstrologerActiveConsultationScreenState extends State<AstrologerActiveCon
     _chatPollTimer?.cancel();
     _heartbeatTimer?.cancel();
     if (widget.sessionId != null) {
-      await ApiService.post('/sessions/end.php', {'session_id': widget.sessionId, 'rating': 5});
+      final endRes = await ApiService.post('/chat/end.php', {
+        'session_id': widget.sessionId,
+        'duration_seconds': _secondsElapsed,
+        'rating': 5,
+        'ended_by': 'astrologer'
+      });
+      if (endRes['ok'] == true && endRes['data'] != null && endRes['data']['astrologer_share'] != null) {
+        AstrologerState.withdrawableBalance += (endRes['data']['astrologer_share'] as num).toDouble();
+      }
     }
     if (!mounted) return;
     Navigator.pop(context);

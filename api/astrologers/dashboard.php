@@ -100,7 +100,7 @@ Response::json(true, 'Astrologer dashboard loaded successfully', [
         'id' => (int)$astrologer['id'],
         'name' => $astrologer['name'],
         'phone' => $astrologer['phone'],
-        'call_status' => $astrologer['call_status'] ?? 'available',
+        'call_status' => $astrologer['call_status'] ?? 'offline',
         'audio_rate_min' => (float)$astrologer['audio_rate_min'],
         'video_rate_min' => (float)$astrologer['video_rate_min'],
         'chat_rate_min' => (float)$astrologer['chat_rate_min'],
