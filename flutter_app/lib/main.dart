@@ -84,34 +84,39 @@ class ApiService {
 }
 
 // ==============================================================================
-// 🌟 ASTROTHEME - VEDIC EMERALD GREEN & SOLAR YELLOW DESIGN SYSTEM (UI/UX PRO MAX)
+// 🌟 ASTROTHEME - VEDIC SOLAR YELLOW & LIGHT GREEN DESIGN SYSTEM (UI/UX PRO MAX)
 // ==============================================================================
 class AstroTheme {
-  // Sacred Emerald Green Palette (Budha / Intellect / Growth / Peace)
-  static const Color emeraldNight = Color(0xFF041611); // Scaffold background
-  static const Color forestSurface = Color(0xFF08231B); // Glassmorphic cards
-  static const Color jadeContainer = Color(0xFF0C2D23); // Inner containers
-  static const Color headerGreen = Color(0xFF061E17); // AppBars & NavBars
-  static const Color borderGreen = Color(0xFF10392C); // Card borders
-  static const Color borderSubtle = Color(0xFF0E382B); // Subtle dividers
+  // Sacred Dark Mint & Light Green Palette (Budha / Intellect / Growth / Peace)
+  static const Color emeraldNight = Color(0xFF031713); // Scaffold background (Deep Mint-Night)
+  static const Color forestSurface = Color(0xFF06261F); // Glassmorphic cards (Sacred Forest)
+  static const Color jadeContainer = Color(0xFF0A342B); // Inner containers
+  static const Color headerGreen = Color(0xFF041E17); // AppBars & NavBars
+  static const Color borderGreen = Color(0xFF0E4035); // Card glass borders
+  static const Color borderSubtle = Color(0xFF0C382E); // Subtle dividers
 
-  // Solar Yellow & Temple Gold Palette (Guru / Brihaspati / Prosperity / Wisdom)
-  static const Color solarYellow = Color(0xFFFACC15); // Primary solar gold/yellow
+  // Solar Yellow & Temple Gold Palette (Guru / Surya / Prosperity / Wisdom)
+  static const Color solarYellow = Color(0xFFFACC15); // Primary solar gold/yellow (#FACC15)
   static const Color amberGold = Color(0xFFF59E0B); // Secondary turmeric amber
-  static const Color lightGold = Color(0xFFFEF08A); // Champagne gold
-  static const Color emeraldAccent = Color(0xFF10B981); // Sacred Basil / Emerald
-  static const Color textMint = Color(0xFFA7F3D0); // Soft mint text
+  static const Color lightGold = Color(0xFFFEF08A); // Champagne light gold
+  
+  // Light Green Palette Token
+  static const Color lightGreen = Color(0xFF34D399); // Primary Light Green (#34D399)
+  static const Color lightGreenAccent = Color(0xFF6EE7B7); // Soft Vibrant Light Green
+  static const Color lightGreenMint = Color(0xFFA7F3D0); // Soft Light Green Mint
+  static const Color emeraldAccent = Color(0xFF34D399); // Sacred Basil / Light Emerald
+  static const Color textMint = Color(0xFFA7F3D0); // Soft mint caption text
 
-  // Modern Vedic Spiritual Minimalist (Astrologer Design Tokens)
-  static const Color pine = Color(0xFF0D4D4D); // Deep Spiritual Pine / Teal
-  static const Color pineDark = Color(0xFF072626); // Dark Teal Canvas
-  static const Color pineSurface = Color(0xFF0A3333); // Card Surface
-  static const Color royalGold = Color(0xFFFCCD4A); // Royal Gold / Solar Yellow
-  static const Color goldAmber = Color(0xFFF9A825); // Mustard Gold
-  static const Color statusOnline = Color(0xFF0E971C); // Emerald Green (Online)
-  static const Color statusBusy = Color(0xFFBD7A2C); // Amber Orange (In-Session)
-  static const Color statusDanger = Color(0xFFDB292C); // Crimson Red (End Call)
-  static const Color statusOffline = Color(0xFF757575); // Slate Grey (Offline)
+  // Modern Vedic Astrologer Theme Tokens
+  static const Color pine = Color(0xFF0B4D3C); // Deep Spiritual Mint Pine
+  static const Color pineDark = Color(0xFF031713); // Dark Teal Canvas
+  static const Color pineSurface = Color(0xFF08362A); // Card Surface
+  static const Color royalGold = Color(0xFFFACC15); // Royal Gold / Solar Yellow
+  static const Color goldAmber = Color(0xFFF59E0B); // Mustard Amber Yellow
+  static const Color statusOnline = Color(0xFF34D399); // Light Green (Online)
+  static const Color statusBusy = Color(0xFFF59E0B); // Amber Yellow (In-Session)
+  static const Color statusDanger = Color(0xFFEF4444); // Crimson Red (End Call)
+  static const Color statusOffline = Color(0xFF94A3B8); // Slate Grey (Offline)
 }
 
 ImageProvider safeAstroImage(String? url) {
@@ -135,8 +140,13 @@ class AstroSubamApp extends StatelessWidget {
         primaryColor: AstroTheme.solarYellow,
         colorScheme: const ColorScheme.dark(
           primary: AstroTheme.solarYellow,
-          secondary: AstroTheme.emeraldAccent,
+          secondary: AstroTheme.lightGreen,
           surface: AstroTheme.forestSurface,
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: AstroTheme.headerGreen,
+          selectedItemColor: AstroTheme.solarYellow,
+          unselectedItemColor: AstroTheme.lightGreenMint,
         ),
         fontFamily: 'Roboto',
       ),

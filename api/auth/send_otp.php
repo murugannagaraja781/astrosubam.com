@@ -30,16 +30,28 @@ $otp = $isBypass ? SMS::STATIC_OTP : (string)mt_rand(1000, 9999);
 
 $db = getDb();
 
-// Ensure user_otps table exists
-$db->exec("CREATE TABLE IF NOT EXISTS `user_otps` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `phone` VARCHAR(20) NOT NULL,
-    `otp` VARCHAR(10) NOT NULL,
-    `expires_at` DATETIME NOT NULL,
-    `verified` TINYINT(1) DEFAULT 0,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX (`phone`)
-) ENGINE=InnoDB;");
+// Ensure user_otps table exists (Dual-Database SQLite & MySQL support)
+$driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
+if ($driver === 'sqlite') {
+    $db->exec("CREATE TABLE IF NOT EXISTS `user_otps` (
+        `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+        `phone` TEXT NOT NULL,
+        `otp` TEXT NOT NULL,
+        `expires_at` DATETIME NOT NULL,
+        `verified` INTEGER DEFAULT 0,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+} else {
+    $db->exec("CREATE TABLE IF NOT EXISTS `user_otps` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `phone` VARCHAR(20) NOT NULL,
+        `otp` VARCHAR(10) NOT NULL,
+        `expires_at` DATETIME NOT NULL,
+        `verified` TINYINT(1) DEFAULT 0,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (`phone`)
+    ) ENGINE=InnoDB;");
+}
 
 // Save OTP valid for 10 minutes
 $expiresAt = date('Y-m-d H:i:s', time() + 600);

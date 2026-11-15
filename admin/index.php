@@ -4,6 +4,9 @@
 declare(strict_types=1);
 
 if (session_status() === PHP_SESSION_NONE) {
+    if (ini_get('session.cookie_path') !== '/') {
+        session_set_cookie_params(['path' => '/', 'samesite' => 'Lax']);
+    }
     session_start();
 }
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -25,6 +28,7 @@ function ensureAdminsTable(PDO $db): void {
             `id` INTEGER PRIMARY KEY AUTOINCREMENT,
             `username` TEXT UNIQUE NOT NULL,
             `email` TEXT,
+            `phone` TEXT NULL,
             `password` TEXT NOT NULL,
             `name` TEXT NOT NULL,
             `role` TEXT DEFAULT 'super_admin',
@@ -37,6 +41,7 @@ function ensureAdminsTable(PDO $db): void {
             `id` INT AUTO_INCREMENT PRIMARY KEY,
             `username` VARCHAR(100) UNIQUE NOT NULL,
             `email` VARCHAR(150) NULL,
+            `phone` VARCHAR(20) NULL,
             `password` VARCHAR(255) NOT NULL,
             `name` VARCHAR(150) NOT NULL,
             `role` VARCHAR(50) DEFAULT 'super_admin',
@@ -44,15 +49,34 @@ function ensureAdminsTable(PDO $db): void {
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX (`username`),
-            INDEX (`status`)
+            INDEX (`status`),
+            INDEX (`phone`)
         ) ENGINE=InnoDB");
+    }
+
+    // Ensure phone column exists if table existed previously without it
+    try {
+        $db->query("SELECT phone FROM admins LIMIT 1");
+    } catch (\Throwable $e) {
+        try {
+            $db->exec("ALTER TABLE admins ADD COLUMN phone VARCHAR(20) NULL");
+        } catch (\Throwable $e2) {}
     }
 
     $st = $db->query("SELECT COUNT(*) FROM admins");
     if ((int)$st->fetchColumn() === 0) {
         $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
-        $ins = $db->prepare("INSERT INTO admins (username, email, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?)");
-        $ins->execute(['admin', 'admin@astrosubam.com', $hashed, 'Master Super Admin', 'super_admin', 'active']);
+        $ins = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $ins->execute(['admin', 'admin@astrosubam.com', '9944700648', $hashed, 'Master Super Admin', 'super_admin', 'active']);
+    }
+
+    // Ensure +91 99447 00648 Super Admin exists
+    $st2 = $db->prepare("SELECT id FROM admins WHERE phone = '9944700648' OR username = 'superadmin_9944700648' LIMIT 1");
+    $st2->execute();
+    if (!$st2->fetch()) {
+        $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
+        $ins2 = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $ins2->execute(['superadmin_9944700648', 'superadmin@astrosubam.com', '9944700648', $hashed, 'Super Admin (+91 99447 00648)', 'super_admin', 'active']);
     }
     $ensured = true;
 }
@@ -178,7 +202,62 @@ if (!$isLoggedIn) {
         </div>
         <?php endif; ?>
 
-        <form method="POST" action="index.php" class="space-y-4">
+        <!-- Segmented Tab Switcher: Mobile OTP vs Password -->
+        <div class="flex rounded-xl bg-astro-card p-1 mb-5 border border-astro-border">
+            <button type="button" onclick="switchLoginTab('otp')" id="tabBtnOtp" class="flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-astro-gold text-astro-base shadow">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> மொபைல் OTP
+            </button>
+            <button type="button" onclick="switchLoginTab('password')" id="tabBtnPass" class="flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-white/60 hover:text-white">
+                <i data-lucide="lock" class="w-3.5 h-3.5"></i> கடவுச்சொல்
+            </button>
+        </div>
+
+        <!-- 1. MOBILE OTP LOGIN TAB -->
+        <div id="otpLoginForm" class="space-y-4">
+            <div id="otpStatusMsg" class="hidden p-3 rounded-xl text-xs flex items-center gap-2"></div>
+
+            <div>
+                <label class="block text-xs font-semibold text-white/70 mb-1.5">சூப்பர் அட்மின் மொபைல் எண் (Mobile)</label>
+                <div class="relative">
+                    <input type="tel" id="adminOtpPhone" value="9944700648" placeholder="10-இலக்க மொபைல் எண்" class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
+                    <i data-lucide="phone" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
+                </div>
+            </div>
+
+            <button type="button" id="btnSendAdminOtp" onclick="sendAdminOtp()" class="w-full py-2.5 rounded-xl bg-astro-emerald/20 hover:bg-astro-emerald/30 border border-astro-emerald/50 text-astro-textMint font-semibold text-xs transition flex items-center justify-center gap-1.5">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i> OTP அனுப்புக (Send OTP SMS)
+            </button>
+
+            <div id="adminOtpSection" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1.5">4-இலக்க OTP குறியீடு (OTP Code)</label>
+                    <div class="relative">
+                        <input type="text" id="adminOtpCode" maxlength="6" value="0101" placeholder="0101" class="w-full bg-astro-base border border-astro-gold/50 rounded-xl px-4 py-3 pl-10 text-sm tracking-widest font-mono text-center text-astro-gold focus:outline-none focus:border-astro-gold transition">
+                        <i data-lucide="key" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
+                    </div>
+                    <p class="text-[11px] text-white/40 mt-1 flex items-center justify-between">
+                        <span>SMS தாமதமானால்: <code class="text-astro-gold font-bold">0101</code></span>
+                        <span class="text-astro-emerald">செல்லுபடியாகும்: 10m</span>
+                    </p>
+                </div>
+
+                <button type="button" id="btnVerifyAdminOtp" onclick="verifyAdminOtp()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-astro-gold to-astro-goldAmber text-astro-base font-bold text-sm hover:opacity-95 transition shadow-lg shadow-astro-gold/20 flex items-center justify-center gap-2">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i> சரிபார்த்து Dashboard திறக்க (Verify & Open)
+                </button>
+            </div>
+
+            <!-- 1-Click Fast Super Admin Login Card -->
+            <button type="button" onclick="quickSuperAdminLogin()" class="w-full p-2.5 rounded-xl bg-astro-gold/15 border border-astro-gold/40 hover:border-astro-gold text-left transition flex items-center justify-between mt-3">
+                <div>
+                    <span class="font-bold text-astro-gold block text-[11px]">⚡ Super Admin (+91 99447 00648)</span>
+                    <span class="text-[10px] text-white/70">1-Click OTP மூலம் உடனடியாக Dashboard திறக்க</span>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-astro-gold text-astro-base">1-Click</span>
+            </button>
+        </div>
+
+        <!-- 2. PASSWORD LOGIN TAB -->
+        <form id="passLoginForm" method="POST" action="index.php" class="space-y-4 hidden">
             <div>
                 <label class="block text-xs font-semibold text-white/70 mb-1.5">பயனர் பெயர் (Username)</label>
                 <div class="relative">
@@ -208,7 +287,112 @@ if (!$isLoggedIn) {
         </div>
     </div>
 
-    <script>lucide.createIcons();</script>
+    <script>
+        lucide.createIcons();
+
+        function switchLoginTab(mode) {
+            const otpForm = document.getElementById('otpLoginForm');
+            const passForm = document.getElementById('passLoginForm');
+            const tabOtp = document.getElementById('tabBtnOtp');
+            const tabPass = document.getElementById('tabBtnPass');
+
+            if (mode === 'otp') {
+                otpForm.classList.remove('hidden');
+                passForm.classList.add('hidden');
+                tabOtp.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-astro-gold text-astro-base shadow';
+                tabPass.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-white/60 hover:text-white';
+            } else {
+                otpForm.classList.add('hidden');
+                passForm.classList.remove('hidden');
+                tabPass.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-astro-gold text-astro-base shadow';
+                tabOtp.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-white/60 hover:text-white';
+            }
+        }
+
+        function showStatus(msg, isSuccess = true) {
+            const el = document.getElementById('otpStatusMsg');
+            el.className = isSuccess 
+                ? 'p-3 rounded-xl text-xs flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                : 'p-3 rounded-xl text-xs flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-300';
+            el.innerHTML = isSuccess ? '✅ ' + msg : '❌ ' + msg;
+            el.classList.remove('hidden');
+        }
+
+        async function sendAdminOtp() {
+            const phone = document.getElementById('adminOtpPhone').value.trim();
+            const btn = document.getElementById('btnSendAdminOtp');
+            if (!phone) {
+                showStatus('மொபைல் எண்ணை உள்ளிடவும்', false);
+                return;
+            }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="inline-block animate-spin mr-1">⏳</span> OTP அனுப்பப்படுகிறது...';
+            try {
+                const res = await fetch('../api/auth/send_otp.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone })
+                });
+                const data = await res.json();
+                if (data.ok || data.success) {
+                    showStatus('OTP உங்கள் எண்ணிற்கு (' + phone + ') அனுப்பப்பட்டது! (அல்லது 0101 பயன்படுத்தவும்)');
+                    document.getElementById('adminOtpCode').focus();
+                } else {
+                    showStatus(data.message || 'OTP அனுப்ப முடியவில்லை', false);
+                }
+            } catch (e) {
+                showStatus('இணைப்பு பிழை: ' + e.message, false);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔄 மீண்டும் OTP அனுப்புக';
+            }
+        }
+
+        async function verifyAdminOtp() {
+            const phone = document.getElementById('adminOtpPhone').value.trim();
+            const otp = document.getElementById('adminOtpCode').value.trim();
+            const btn = document.getElementById('btnVerifyAdminOtp');
+
+            if (!phone || !otp) {
+                showStatus('மொபைல் எண் மற்றும் OTP குறியீடு தேவை', false);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="inline-block animate-spin mr-1">⏳</span> சரிபார்க்கப்படுகிறது...';
+
+            try {
+                const res = await fetch('../api/auth/verify_otp.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone, otp: otp })
+                });
+                const data = await res.json();
+                if (data.ok || data.success) {
+                    showStatus('உள்நுழைவு வெற்றிகரமாக முடிந்தது! Dashboard திறக்கப்படுகிறது...', true);
+                    setTimeout(() => {
+                        window.location.href = (data.data && data.data.redirect) ? data.data.redirect : 'index.php';
+                    }, 500);
+                } else {
+                    showStatus(data.message || 'தவறான OTP குறியீடு', false);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i> சரிபார்த்து Dashboard திறக்க';
+                    lucide.createIcons();
+                }
+            } catch (e) {
+                showStatus('இணைப்பு பிழை: ' + e.message, false);
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i> சரிபார்த்து Dashboard திறக்க';
+                lucide.createIcons();
+            }
+        }
+
+        function quickSuperAdminLogin() {
+            document.getElementById('adminOtpPhone').value = '9944700648';
+            document.getElementById('adminOtpCode').value = '0101';
+            verifyAdminOtp();
+        }
+    </script>
 </body>
 </html>
 <?php
@@ -422,6 +606,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_super_admin'])
     $name = trim($_POST['admin_name'] ?? '');
     $username = strtolower(trim($_POST['admin_username'] ?? ''));
     $email = trim($_POST['admin_email'] ?? '');
+    $phone = preg_replace('/[^0-9]/', '', trim($_POST['admin_phone'] ?? ''));
+    if (strlen($phone) > 10 && str_starts_with($phone, '91')) {
+        $phone = substr($phone, 2);
+    }
     $password = trim($_POST['admin_password'] ?? '');
     $role = trim($_POST['admin_role'] ?? 'super_admin');
     $status = trim($_POST['admin_status'] ?? 'active');
@@ -436,15 +624,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_super_admin'])
         $toastMessage = '❌ கடவுச்சொல் குறைந்தபட்சம் 6 எழுத்துக்கள் கொண்டிருக்க வேண்டும்!';
         $toastType = 'error';
     } else {
-        $chk = $db->prepare("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?))");
-        $chk->execute([$username, $email]);
+        $chk = $db->prepare("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?)) OR (phone != '' AND phone = ?)");
+        $chk->execute([$username, $email, $phone]);
         if ((int)$chk->fetchColumn() > 0) {
-            $toastMessage = "❌ '{$username}' பயனர் பெயர் அல்லது மின்னஞ்சல் ஏற்கனவே பயன்பாட்டில் உள்ளது!";
+            $toastMessage = "❌ '{$username}' பயனர் பெயர், மின்னஞ்சல் அல்லது மொபைல் எண் ஏற்கனவே பயன்பாட்டில் உள்ளது!";
             $toastType = 'error';
         } else {
             $hashedPass = password_hash($password, PASSWORD_BCRYPT);
-            $ins = $db->prepare("INSERT INTO admins (username, email, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?)");
-            $ins->execute([$username, $email, $hashedPass, $name, $role, $status]);
+            $ins = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins->execute([$username, $email, $phone, $hashedPass, $name, $role, $status]);
+
+            // Also ensure in users table if phone given
+            if (!empty($phone)) {
+                $uCheck = $db->prepare("SELECT id FROM users WHERE phone = ?");
+                $uCheck->execute([$phone]);
+                $uRow = $uCheck->fetch();
+                if ($uRow) {
+                    $db->prepare("UPDATE users SET role = 'admin', name = ? WHERE id = ?")->execute([$name, $uRow['id']]);
+                } else {
+                    $db->prepare("INSERT INTO users (name, phone, password_hash, wallet_balance, role) VALUES (?, ?, ?, 10000.00, 'admin')")
+                       ->execute([$name, $phone, $hashedPass]);
+                }
+            }
+
             $toastMessage = "✅ புதிய Super Admin '{$name}' (@{$username}) வெற்றிகரமாக உருவாக்கப்பட்டது!";
             $toastType = 'success';
         }
@@ -901,6 +1103,15 @@ $activeTab = $_GET['tab'] ?? 'overview';
                             </div>
 
                             <div>
+                                <label class="block text-white/80 font-semibold mb-1">மொபைல் எண் (Mobile / OTP Login)</label>
+                                <div class="relative">
+                                    <input type="tel" name="admin_phone" placeholder="எ.கா. 9944700648" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 pl-9 text-white focus:outline-none focus:border-astro-gold transition">
+                                    <i data-lucide="phone" class="w-4 h-4 text-white/40 absolute left-3 top-3"></i>
+                                </div>
+                                <p class="text-[10px] text-white/40 mt-1">இந்த மொபைல் எண்ணை உள்ளிட்டு OTP மூலம் Super Admin உள்நுழையலாம்</p>
+                            </div>
+
+                            <div>
                                 <label class="block text-white/80 font-semibold mb-1">கடவுச்சொல் (Password) *</label>
                                 <div class="relative">
                                     <input type="password" id="newAdminPassword" name="admin_password" required minlength="6" placeholder="குறைந்தபட்சம் 6 எழுத்துக்கள்" class="w-full bg-astro-card border border-astro-border rounded-xl px-3.5 py-2.5 pr-10 text-white focus:outline-none focus:border-astro-gold transition">
@@ -988,6 +1199,9 @@ $activeTab = $_GET['tab'] ?? 'overview';
                                                         <?php endif; ?>
                                                     </div>
                                                     <span class="text-[11px] text-astro-textMint">@<?= htmlspecialchars($adm['username']) ?></span>
+                                                    <?php if (!empty($adm['phone'])): ?>
+                                                        <span class="text-[10px] text-astro-gold block truncate font-mono"><i data-lucide="phone" class="w-2.5 h-2.5 inline mr-0.5"></i>+91 <?= htmlspecialchars($adm['phone']) ?></span>
+                                                    <?php endif; ?>
                                                     <?php if (!empty($adm['email'])): ?>
                                                         <span class="text-[10px] text-white/40 block truncate"><?= htmlspecialchars($adm['email']) ?></span>
                                                     <?php endif; ?>

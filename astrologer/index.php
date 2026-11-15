@@ -180,21 +180,26 @@ if ($currentAstro) {
                 extend: {
                     colors: {
                         pine: {
-                            DEFAULT: '#0D4D4D',
-                            dark: '#072626',
-                            light: '#136767',
-                            surface: '#0A3333'
+                            DEFAULT: '#0B4D3C',      // Deep Mint Pine
+                            dark: '#031713',       // Dark Mint Canvas
+                            light: '#34D399',      // Light Green Accent
+                            surface: '#083B2E'     // Card Surface
                         },
                         gold: {
-                            DEFAULT: '#FCCD4A',
-                            amber: '#F9A825',
-                            light: '#FEF3C7'
+                            DEFAULT: '#FACC15',    // Solar Yellow (#FACC15)
+                            amber: '#F59E0B',      // Amber Yellow
+                            light: '#FEF08A'       // Light Yellow
+                        },
+                        lightgreen: {
+                            DEFAULT: '#34D399',    // Light Green (#34D399)
+                            bright: '#86EFAC',     // Vibrant Light Green
+                            soft: '#A7F3D0'        // Pale Mint Green
                         },
                         status: {
-                            online: '#0E971C',
-                            busy: '#BD7A2C',
-                            offline: '#757575',
-                            danger: '#DB292C'
+                            online: '#34D399',     // Light Green (Online)
+                            busy: '#F59E0B',       // Amber Yellow (In-Session)
+                            offline: '#94A3B8',    // Slate Grey (Offline)
+                            danger: '#EF4444'      // Red (End Call)
                         }
                     },
                     fontFamily: {

@@ -95,18 +95,20 @@ try {
                 extend: {
                     colors: {
                         astro: {
-                            base: '#041611',        // Deep Emerald Forest Night
-                            surface: '#08231B',     // Sacred Forest Surface
-                            card: '#0C2D23',        // Frosted Jade Card
-                            cardHover: '#10392C',   // Hover Jade Card
-                            border: 'rgba(16, 185, 129, 0.22)',
-                            emerald: '#10B981',     // Sacred Basil / Emerald (Budha)
-                            emeraldLight: '#34D399',
-                            emeraldDark: '#064E3B',
-                            gold: '#FACC15',        // Solar Yellow / Guru Brihaspati Gold
-                            goldAmber: '#F59E0B',   // Deep Amber Turmeric Gold
-                            goldLight: '#FEF08A',   // Champagne Light Gold
+                            base: '#031713',        // Deep Mint-Night Black
+                            surface: '#06261F',     // Sacred Forest Surface
+                            card: '#0A342B',        // Frosted Jade Surface
+                            cardHover: '#0E4035',   // Hover Jade Surface
+                            border: 'rgba(52, 211, 153, 0.25)', // Light Green Glass Border
+                            emerald: '#34D399',     // Light Green (Budha / Intellect / Growth)
+                            emeraldLight: '#6EE7B7', // Soft Light Green Accent
+                            emeraldDark: '#047857', // Deep Mint Emerald
+                            gold: '#FACC15',        // Solar Yellow / Guru Brihaspati Gold (#FACC15)
+                            goldAmber: '#F59E0B',   // Deep Amber Turmeric Yellow
+                            goldLight: '#FEF08A',   // Champagne Light Yellow
                             goldDark: '#B45309',
+                            lightgreen: '#34D399',  // Primary Light Green Accent
+                            lightgreenBright: '#86EFAC', // Soft Vibrant Light Green
                             textMuted: '#94A3B8',
                             textMint: '#A7F3D0',
                         }
@@ -117,8 +119,8 @@ try {
                         tamil: ['"Mukta Malar"', 'sans-serif'],
                     },
                     boxShadow: {
-                        'glow-gold': '0 0 25px rgba(250, 204, 21, 0.28)',
-                        'glow-emerald': '0 0 30px rgba(16, 185, 129, 0.25)',
+                        'glow-gold': '0 0 25px rgba(250, 204, 21, 0.35)',
+                        'glow-emerald': '0 0 25px rgba(52, 211, 153, 0.35)',
                         'card-elevate': '0 12px 36px -10px rgba(0, 0, 0, 0.65)',
                     }
                 }
@@ -128,71 +130,78 @@ try {
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Custom Customizations & Glassmorphism */
+        /* Custom Customizations & Glassmorphism - Yellow & Light Green Theme */
         body {
-            background-color: #041611;
+            background-color: #031713;
             color: #ffffff;
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-image: 
-                radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 15%, rgba(250, 204, 21, 0.09) 0%, transparent 45%),
-                radial-gradient(circle at 50% 75%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+                radial-gradient(circle at 15% 20%, rgba(52, 211, 153, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 85% 15%, rgba(250, 204, 21, 0.14) 0%, transparent 45%),
+                radial-gradient(circle at 50% 75%, rgba(52, 211, 153, 0.08) 0%, transparent 50%);
             background-attachment: fixed;
         }
 
         .glass-panel {
-            background: rgba(12, 45, 35, 0.68);
+            background: rgba(6, 38, 31, 0.78);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(16, 185, 129, 0.22);
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
         .glass-card {
-            background: rgba(8, 35, 27, 0.75);
+            background: rgba(10, 52, 43, 0.72);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(52, 211, 153, 0.22);
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .glass-card:hover {
-            border-color: rgba(250, 204, 21, 0.55);
-            box-shadow: 0 12px 35px -8px rgba(250, 204, 21, 0.2), 0 0 20px rgba(16, 185, 129, 0.2);
+            border-color: rgba(250, 204, 21, 0.65);
+            box-shadow: 0 14px 40px -8px rgba(250, 204, 21, 0.25), 0 0 24px rgba(52, 211, 153, 0.25);
             transform: translateY(-4px);
         }
 
-        .btn-gold {
+        /* Yellow Solar CTA Button */
+        .btn-gold, .btn-yellow {
             background: linear-gradient(135deg, #FACC15 0%, #F59E0B 100%);
-            color: #041611;
-            font-weight: 700;
-            transition: all 0.2s ease-in-out;
-            box-shadow: 0 4px 18px rgba(250, 204, 21, 0.35);
+            color: #031713;
+            font-weight: 800;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 18px rgba(250, 204, 21, 0.4);
         }
 
-        .btn-gold:hover {
+        .btn-gold:hover, .btn-yellow:hover {
             background: linear-gradient(135deg, #FEF08A 0%, #FACC15 100%);
-            box-shadow: 0 6px 24px rgba(250, 204, 21, 0.55);
-            transform: scale(1.02);
+            box-shadow: 0 6px 26px rgba(250, 204, 21, 0.6);
+            transform: translateY(-1px) scale(1.02);
         }
 
-        .btn-emerald {
-            background: rgba(16, 185, 129, 0.15);
-            color: #A7F3D0;
-            border: 1px solid rgba(16, 185, 129, 0.45);
-            transition: all 0.2s ease;
+        /* Light Green Sacred CTA Button */
+        .btn-emerald, .btn-lightgreen {
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.2) 0%, rgba(16, 185, 129, 0.3) 100%);
+            color: #6EE7B7;
+            border: 1px solid rgba(52, 211, 153, 0.55);
+            font-weight: 700;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 18px rgba(52, 211, 153, 0.2);
         }
 
-        .btn-emerald:hover {
-            background: rgba(16, 185, 129, 0.3);
-            border-color: #10B981;
-            color: #FFFFFF;
+        .btn-emerald:hover, .btn-lightgreen:hover {
+            background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+            color: #031713;
+            border-color: #86EFAC;
+            box-shadow: 0 6px 26px rgba(52, 211, 153, 0.5);
+            transform: translateY(-1px) scale(1.02);
         }
 
         /* Pulsing Online Indicator */
         @keyframes pulse-ring {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.8); }
+            70% { transform: scale(1); box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
         }
 
         .pulse-online {
@@ -201,11 +210,11 @@ try {
 
         /* Subtle sacred aura */
         .gold-text-glow {
-            text-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
+            text-shadow: 0 0 16px rgba(250, 204, 21, 0.45);
         }
 
         .emerald-text-glow {
-            text-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+            text-shadow: 0 0 16px rgba(52, 211, 153, 0.45);
         }
     </style>
 </head>
@@ -1043,6 +1052,13 @@ try {
                     <button type="button" onclick="quickFillAuth('9998887770', 'client123', 'AstroSubam Dev User', 500.0)" class="p-2 rounded-xl bg-astro-surface border border-astro-emerald/30 hover:border-astro-gold text-left transition">
                         <span class="font-bold text-emerald-400 block text-[11px]">பக்தர் 2 (Dev)</span>
                         <span class="text-[10px] text-white/60">9998887770 (₹500)</span>
+                    </button>
+                    <button type="button" onclick="quickFillAuth('9944700648', '0101', 'Super Admin (+91 99447 00648)', 10000.0)" class="col-span-2 p-2 rounded-xl bg-astro-gold/15 border border-astro-gold/40 hover:border-astro-gold text-left transition flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-astro-gold block text-[11px]">🛡️ Super Admin (+91 99447 00648)</span>
+                            <span class="text-[10px] text-white/70">OTP வழியாக Super Admin Dashboard திறக்க</span>
+                        </div>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-astro-gold text-astro-base">1-Click OTP</span>
                     </button>
                 </div>
             </div>
@@ -2037,6 +2053,15 @@ try {
                         body: JSON.stringify({ phone: phone, otp: otp })
                     });
                     const data = await res.json();
+
+                    // Check if Super Admin login (+91 99447 00648)
+                    const cleanP = phone.replace(/[^0-9]/g, '');
+                    if (data.data && (data.data.role === 'super_admin' || data.data.redirect || cleanP.endsWith('9944700648'))) {
+                        alert('🛡️ Super Admin உள்நுழைவு வெற்றிகரமாக முடிந்தது!\n\nவரவேற்கிறோம் Super Admin (+91 99447 00648)!\nSuper Admin Dashboard திறக்கப்படுகிறது...');
+                        window.location.href = (data.data && data.data.redirect) ? data.data.redirect : 'admin/index.php';
+                        return;
+                    }
+
                     if ((data.ok || data.success) && data.data && data.data.user) {
                         const u = data.data.user;
                         AppState.userName = u.name || ('பக்தர் ' + phone.substring(6));
