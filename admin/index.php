@@ -76,7 +76,16 @@ function ensureAdminsTable(PDO $db): void {
     if (!$st2->fetch()) {
         $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
         $ins2 = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $ins2->execute(['superadmin_9944700648', 'superadmin@astrosubam.com', '9944700648', $hashed, 'Super Admin (+91 99447 00648)', 'super_admin', 'active']);
+        $ins2->execute(['superadmin_9944700648', 'superadmin@astrosubam.com', '9944700648', $hashed, 'Super Admin', 'super_admin', 'active']);
+    }
+
+    // Ensure Developer Super Admin (9876543210) exists
+    $st3 = $db->prepare("SELECT id FROM admins WHERE phone = '9876543210' OR username = 'dev_admin_9876543210' LIMIT 1");
+    $st3->execute();
+    if (!$st3->fetch()) {
+        $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
+        $ins3 = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $ins3->execute(['dev_admin_9876543210', 'developer@astrosubam.com', '9876543210', $hashed, 'Developer Super Admin', 'super_admin', 'active']);
     }
     $ensured = true;
 }
@@ -219,7 +228,7 @@ if (!$isLoggedIn) {
             <div>
                 <label class="block text-xs font-semibold text-white/70 mb-1.5">சூப்பர் அட்மின் மொபைல் எண் (Mobile)</label>
                 <div class="relative">
-                    <input type="tel" id="adminOtpPhone" value="9944700648" placeholder="10-இலக்க மொபைல் எண்" class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
+                    <input type="tel" id="adminOtpPhone" value="" placeholder="10-இலக்க மொபைல் எண்" class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
                     <i data-lucide="phone" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
                 </div>
             </div>
@@ -232,28 +241,15 @@ if (!$isLoggedIn) {
                 <div>
                     <label class="block text-xs font-semibold text-white/70 mb-1.5">4-இலக்க OTP குறியீடு (OTP Code)</label>
                     <div class="relative">
-                        <input type="text" id="adminOtpCode" maxlength="6" value="0101" placeholder="0101" class="w-full bg-astro-base border border-astro-gold/50 rounded-xl px-4 py-3 pl-10 text-sm tracking-widest font-mono text-center text-astro-gold focus:outline-none focus:border-astro-gold transition">
+                        <input type="text" id="adminOtpCode" maxlength="6" value="" placeholder="••••" class="w-full bg-astro-base border border-astro-gold/50 rounded-xl px-4 py-3 pl-10 text-sm tracking-widest font-mono text-center text-astro-gold focus:outline-none focus:border-astro-gold transition">
                         <i data-lucide="key" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
                     </div>
-                    <p class="text-[11px] text-white/40 mt-1 flex items-center justify-between">
-                        <span>SMS தாமதமானால்: <code class="text-astro-gold font-bold">0101</code></span>
-                        <span class="text-astro-emerald">செல்லுபடியாகும்: 10m</span>
-                    </p>
                 </div>
 
                 <button type="button" id="btnVerifyAdminOtp" onclick="verifyAdminOtp()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-astro-gold to-astro-goldAmber text-astro-base font-bold text-sm hover:opacity-95 transition shadow-lg shadow-astro-gold/20 flex items-center justify-center gap-2">
                     <i data-lucide="shield-check" class="w-4 h-4"></i> சரிபார்த்து Dashboard திறக்க (Verify & Open)
                 </button>
             </div>
-
-            <!-- 1-Click Fast Super Admin Login Card -->
-            <button type="button" onclick="quickSuperAdminLogin()" class="w-full p-2.5 rounded-xl bg-astro-gold/15 border border-astro-gold/40 hover:border-astro-gold text-left transition flex items-center justify-between mt-3">
-                <div>
-                    <span class="font-bold text-astro-gold block text-[11px]">⚡ Super Admin (+91 99447 00648)</span>
-                    <span class="text-[10px] text-white/70">1-Click OTP மூலம் உடனடியாக Dashboard திறக்க</span>
-                </div>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-astro-gold text-astro-base">1-Click</span>
-            </button>
         </div>
 
         <!-- 2. PASSWORD LOGIN TAB -->
@@ -261,7 +257,7 @@ if (!$isLoggedIn) {
             <div>
                 <label class="block text-xs font-semibold text-white/70 mb-1.5">பயனர் பெயர் (Username)</label>
                 <div class="relative">
-                    <input type="text" name="username" value="admin" required class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
+                    <input type="text" name="username" value="" placeholder="Username" required class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
                     <i data-lucide="user" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
                 </div>
             </div>
@@ -272,7 +268,6 @@ if (!$isLoggedIn) {
                     <input type="password" name="password" placeholder="••••••••••••" required class="w-full bg-astro-base border border-astro-emerald/30 rounded-xl px-4 py-3 pl-10 text-xs text-white focus:outline-none focus:border-astro-gold transition">
                     <i data-lucide="lock" class="w-4 h-4 text-white/40 absolute left-3.5 top-3.5"></i>
                 </div>
-                <p class="text-[11px] text-white/40 mt-1">Pre-configured Password: <code class="text-astro-gold">Admin@2026</code></p>
             </div>
 
             <button type="submit" name="login_submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-astro-gold to-astro-goldAmber text-astro-base font-bold text-sm hover:opacity-95 transition shadow-lg shadow-astro-gold/20 flex items-center justify-center gap-2 mt-2">
@@ -385,12 +380,6 @@ if (!$isLoggedIn) {
                 btn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i> சரிபார்த்து Dashboard திறக்க';
                 lucide.createIcons();
             }
-        }
-
-        function quickSuperAdminLogin() {
-            document.getElementById('adminOtpPhone').value = '9944700648';
-            document.getElementById('adminOtpCode').value = '0101';
-            verifyAdminOtp();
         }
     </script>
 </body>

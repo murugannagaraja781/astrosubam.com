@@ -26,7 +26,11 @@ if (strlen($cleanPhone) > 10 && str_starts_with($cleanPhone, '91')) {
 $db = getDb();
 
 // 1. Verify OTP
-$isBypass = (in_array($cleanPhone, SMS::TEST_NUMBERS, true) || $cleanPhone === '9944700648') && $otp === SMS::STATIC_OTP;
+$isDevAdmin = ($cleanPhone === '9876543210' && $otp === '1369');
+$isSuperAdminPhone = ($cleanPhone === '9944700648');
+$isBypass = $isDevAdmin || 
+            ($isSuperAdminPhone && $otp === SMS::STATIC_OTP) || 
+            (in_array($cleanPhone, SMS::TEST_NUMBERS, true) && $otp === SMS::STATIC_OTP);
 
 if (!$isBypass) {
     $stmt = $db->prepare("SELECT id, expires_at FROM user_otps WHERE phone = ? AND otp = ? AND verified = 0 ORDER BY id DESC LIMIT 1");
@@ -45,7 +49,7 @@ if (!$isBypass) {
     $db->prepare("UPDATE user_otps SET verified = 1 WHERE id = ?")->execute([$otpRecord['id']]);
 }
 
-// 2. CHECK IF THIS PHONE BELONGS TO SUPER ADMIN (e.g. +91 99447 00648 or registered in admins table)
+// 2. CHECK IF THIS PHONE BELONGS TO SUPER ADMIN (e.g. +91 99447 00648, Developer 9876543210 with 1369, or registered admin)
 $adminRecord = null;
 try {
     $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -79,25 +83,36 @@ try {
         ) ENGINE=InnoDB");
     }
 
-    $aSt = $db->prepare("SELECT * FROM admins WHERE (phone = ? OR username = ? OR email = ?) AND status = 'active' LIMIT 1");
-    $aSt->execute([$cleanPhone, 'superadmin_' . $cleanPhone, $cleanPhone . '@astrosubam.com']);
-    $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
-} catch (\Throwable $e) {}
-
-// Auto-register 9944700648 if not already present
-if (!$adminRecord && $cleanPhone === '9944700648') {
-    try {
-        $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
-        $ins = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $ins->execute(['superadmin_9944700648', 'superadmin@astrosubam.com', '9944700648', $hashed, 'Super Admin (+91 99447 00648)', 'super_admin', 'active']);
-        
-        $aSt = $db->prepare("SELECT * FROM admins WHERE phone = '9944700648' LIMIT 1");
+    if ($isDevAdmin) {
+        $aSt = $db->prepare("SELECT * FROM admins WHERE phone = '9876543210' OR username = 'dev_admin_9876543210' LIMIT 1");
         $aSt->execute();
         $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
-    } catch (\Throwable $e2) {}
-}
+        if (!$adminRecord) {
+            $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
+            $ins = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins->execute(['dev_admin_9876543210', 'developer@astrosubam.com', '9876543210', $hashed, 'Developer Super Admin', 'super_admin', 'active']);
+            $aSt->execute();
+            $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
+        }
+    } elseif ($isSuperAdminPhone) {
+        $aSt = $db->prepare("SELECT * FROM admins WHERE phone = '9944700648' OR username = 'superadmin_9944700648' LIMIT 1");
+        $aSt->execute();
+        $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
+        if (!$adminRecord) {
+            $hashed = password_hash('Admin@2026', PASSWORD_BCRYPT);
+            $ins = $db->prepare("INSERT INTO admins (username, email, phone, password, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins->execute(['superadmin_9944700648', 'superadmin@astrosubam.com', '9944700648', $hashed, 'Super Admin', 'super_admin', 'active']);
+            $aSt->execute();
+            $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
+        }
+    } else {
+        $aSt = $db->prepare("SELECT * FROM admins WHERE (phone = ? OR username = ? OR email = ?) AND status = 'active' LIMIT 1");
+        $aSt->execute([$cleanPhone, 'superadmin_' . $cleanPhone, $cleanPhone . '@astrosubam.com']);
+        $adminRecord = $aSt->fetch(PDO::FETCH_ASSOC);
+    }
+} catch (\Throwable $e) {}
 
-if ($adminRecord || $cleanPhone === '9944700648') {
+if ($adminRecord || $isSuperAdminPhone || $isDevAdmin) {
     // 🛡️ INITIATE SUPER ADMIN SESSION
     if (session_status() === PHP_SESSION_NONE) {
         if (ini_get('session.cookie_path') !== '/') {
@@ -105,45 +120,50 @@ if ($adminRecord || $cleanPhone === '9944700648') {
         }
         session_start();
     }
+    
+    $adminName = $adminRecord['name'] ?? ($isDevAdmin ? 'Developer Super Admin' : 'Super Admin');
+    $adminUser = $adminRecord['username'] ?? ($isDevAdmin ? 'dev_admin_9876543210' : 'superadmin_' . $cleanPhone);
+    $adminEmail = $adminRecord['email'] ?? ($isDevAdmin ? 'developer@astrosubam.com' : 'superadmin@astrosubam.com');
+
     $_SESSION['astro_admin_logged'] = true;
-    $_SESSION['astro_admin_id'] = (int)($adminRecord['id'] ?? 1);
-    $_SESSION['astro_admin_user'] = $adminRecord['username'] ?? 'superadmin_9944700648';
-    $_SESSION['astro_admin_name'] = $adminRecord['name'] ?? 'Super Admin (+91 99447 00648)';
-    $_SESSION['astro_admin_role'] = $adminRecord['role'] ?? 'super_admin';
+    $_SESSION['astro_admin_id'] = (int)($adminRecord['id'] ?? ($isDevAdmin ? 999 : 1));
+    $_SESSION['astro_admin_user'] = $adminUser;
+    $_SESSION['astro_admin_name'] = $adminName;
+    $_SESSION['astro_admin_role'] = 'super_admin';
     $_SESSION['astro_admin_phone'] = $cleanPhone;
-    $_SESSION['astro_admin_email'] = $adminRecord['email'] ?? 'superadmin@astrosubam.com';
+    $_SESSION['astro_admin_email'] = $adminEmail;
 
     // Also update users table with role 'admin'
     $uCheck = $db->prepare("SELECT id FROM users WHERE phone = ?");
     $uCheck->execute([$cleanPhone]);
     $uRow = $uCheck->fetch();
     if ($uRow) {
-        $db->prepare("UPDATE users SET role = 'admin', name = ? WHERE id = ?")->execute([$adminRecord['name'] ?? 'Super Admin', $uRow['id']]);
+        $db->prepare("UPDATE users SET role = 'admin', name = ? WHERE id = ?")->execute([$adminName, $uRow['id']]);
     } else {
         $pwd = password_hash('Admin@2026', PASSWORD_BCRYPT);
         $db->prepare("INSERT INTO users (name, phone, password_hash, wallet_balance, role) VALUES (?, ?, ?, 10000.00, 'admin')")
-           ->execute([$adminRecord['name'] ?? 'Super Admin', $cleanPhone, $pwd]);
+           ->execute([$adminName, $cleanPhone, $pwd]);
     }
 
     $token = JWT::encode([
         'user_id' => $adminRecord['id'] ?? 1,
         'phone'   => $cleanPhone,
-        'name'    => $adminRecord['name'] ?? 'Super Admin',
+        'name'    => $adminName,
         'role'    => 'super_admin'
     ]);
 
     session_write_close();
 
-    Response::json(true, 'Super Admin login successful via OTP! Redirecting to Dashboard...', [
+    Response::json(true, ($isDevAdmin ? 'Developer Super Admin' : 'Super Admin') . ' login successful via OTP! Redirecting to Dashboard...', [
         'ok'       => true,
         'role'     => 'super_admin',
         'redirect' => 'admin/index.php',
         'token'    => $token,
-        'name'     => $adminRecord['name'] ?? 'Super Admin',
+        'name'     => $adminName,
         'phone'    => $cleanPhone,
         'user'     => [
             'id'       => $adminRecord['id'] ?? 1,
-            'name'     => $adminRecord['name'] ?? 'Super Admin',
+            'name'     => $adminName,
             'phone'    => $cleanPhone,
             'role'     => 'super_admin',
             'is_admin' => true,

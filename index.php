@@ -774,7 +774,7 @@ try {
                     <ul class="space-y-2 text-xs text-white/70">
                         <li><a href="#panchangam" class="hover:text-astro-gold">இன்றைய பஞ்சாங்கம்</a></li>
                         <li><button onclick="openWalletModal()" class="hover:text-astro-gold">வாலட் ரீசார்ஜ்</button></li>
-                        <li><a href="admin/index.php" target="_blank" class="hover:text-astro-gold">Super Admin Panel</a></li>
+                        <li><a href="#astrologers" class="hover:text-astro-gold">ஜோதிடர்கள் பட்டியல்</a></li>
                     </ul>
                 </div>
 
@@ -792,7 +792,7 @@ try {
                     <h4 class="font-bold text-xs uppercase tracking-wider text-astro-gold mb-3">உதவி & ஆதரவு</h4>
                     <p class="text-xs text-white/60 mb-2">24/7 வாடிக்கையாளர் உதவி மையம்</p>
                     <p class="text-xs text-astro-gold font-bold">support@astrosubam.com</p>
-                    <p class="text-xs text-white/70 mt-1">+91 99447 00648</p>
+                    <p class="text-xs text-white/70 mt-1">ஹெல்ப்லைன்: +91 99988 87770</p>
                 </div>
             </div>
 
@@ -1035,51 +1035,28 @@ try {
                     <label class="block text-xs text-white/70 mb-1">மொபைல் எண் (Mobile Number)</label>
                     <div class="relative flex items-center">
                         <span class="absolute left-3.5 text-xs font-bold text-astro-gold">+91</span>
-                        <input type="tel" id="auth-phone" value="8000000001" required maxlength="10" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl pl-12 pr-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                        <input type="tel" id="auth-phone" value="" placeholder="10-இலக்க மொபைல் எண்" required maxlength="10" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl pl-12 pr-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
                     </div>
                 </div>
 
                 <!-- Password Field -->
                 <div id="auth-pass-group">
                     <label class="block text-xs text-white/70 mb-1">கடவுச்சொல் (Password)</label>
-                    <input type="password" id="auth-password" value="client123" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                    <input type="password" id="auth-password" value="" placeholder="••••••••" class="w-full bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
                 </div>
 
                 <!-- OTP Field (Hidden by default) -->
                 <div id="auth-otp-group" class="hidden">
                     <div class="flex justify-between items-center mb-1">
                         <label class="text-xs text-white/70">4-இலக்க OTP (Enter 4-Digit OTP)</label>
-                        <span class="text-[10px] text-astro-gold font-bold">Static Test OTP: 0101</span>
                     </div>
-                    <input type="text" id="auth-otp" maxlength="4" value="0101" placeholder="0101" class="w-full text-center tracking-widest text-base font-bold bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-astro-gold">
+                    <input type="text" id="auth-otp" maxlength="4" value="" placeholder="••••" class="w-full text-center tracking-widest text-base font-bold bg-astro-surface border border-astro-emerald/30 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-astro-gold">
                 </div>
 
                 <button type="submit" id="auth-submit-btn" class="btn-gold w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 mt-2">
                     <i data-lucide="log-in" class="w-4 h-4"></i> உள்நுழைக & ஆலோசனை பெறுக
                 </button>
             </form>
-
-            <!-- 1-Click Fast Test Accounts -->
-            <div class="mt-4 pt-3.5 border-t border-astro-emerald/20">
-                <p class="text-[11px] text-white/60 mb-2 text-center font-medium">✨ நேரடி டெமோ கணக்குகள் (1-Click Test Login):</p>
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="quickFillAuth('8000000001', '0101', 'பக்தர் கார்த்திக்', 500.0)" class="p-2 rounded-xl bg-astro-surface border border-astro-emerald/30 hover:border-astro-gold text-left transition">
-                        <span class="font-bold text-astro-gold block text-[11px]">பக்தர் 1 (Test)</span>
-                        <span class="text-[10px] text-white/60">8000000001 (₹500)</span>
-                    </button>
-                    <button type="button" onclick="quickFillAuth('9998887770', 'client123', 'AstroSubam Dev User', 500.0)" class="p-2 rounded-xl bg-astro-surface border border-astro-emerald/30 hover:border-astro-gold text-left transition">
-                        <span class="font-bold text-emerald-400 block text-[11px]">பக்தர் 2 (Dev)</span>
-                        <span class="text-[10px] text-white/60">9998887770 (₹500)</span>
-                    </button>
-                    <button type="button" onclick="quickFillAuth('9944700648', '0101', 'Super Admin (+91 99447 00648)', 10000.0)" class="col-span-2 p-2 rounded-xl bg-astro-gold/15 border border-astro-gold/40 hover:border-astro-gold text-left transition flex items-center justify-between">
-                        <div>
-                            <span class="font-bold text-astro-gold block text-[11px]">🛡️ Super Admin (+91 99447 00648)</span>
-                            <span class="text-[10px] text-white/70">OTP வழியாக Super Admin Dashboard திறக்க</span>
-                        </div>
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-astro-gold text-astro-base">1-Click OTP</span>
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -2072,10 +2049,13 @@ try {
                     });
                     const data = await res.json();
 
-                    // Check if Super Admin login (+91 99447 00648)
+                    // Check if Super Admin login (+91 99447 00648 or Developer 9876543210 with 1369)
                     const cleanP = phone.replace(/[^0-9]/g, '');
-                    if (data.data && (data.data.role === 'super_admin' || data.data.redirect || cleanP.endsWith('9944700648'))) {
-                        alert('🛡️ Super Admin உள்நுழைவு வெற்றிகரமாக முடிந்தது!\n\nவரவேற்கிறோம் Super Admin (+91 99447 00648)!\nSuper Admin Dashboard திறக்கப்படுகிறது...');
+                    const isDevAdmin = cleanP.endsWith('9876543210') && otp === '1369';
+                    const isSuperAdmin = cleanP.endsWith('9944700648') || isDevAdmin || (data.data && data.data.role === 'super_admin');
+                    if (data.data && (isSuperAdmin || data.data.redirect)) {
+                        const adminName = data.data.name || (isDevAdmin ? 'Developer Super Admin' : 'Super Admin');
+                        alert(`🛡️ Super Admin உள்நுழைவு வெற்றிகரமாக முடிந்தது!\n\nவரவேற்கிறோம் ${adminName}!\nSuper Admin Dashboard திறக்கப்படுகிறது...`);
                         window.location.href = (data.data && data.data.redirect) ? data.data.redirect : 'admin/index.php';
                         return;
                     }
@@ -2089,7 +2069,7 @@ try {
                         AppState.userName = 'பக்தர் ' + phone.substring(6);
                         AppState.walletBalance = 500.00;
                     } else {
-                        alert(data.message || 'தவறான OTP! டெமோவிற்கு 0101 பயன்படுத்தவும்.');
+                        alert(data.message || 'தவறான OTP! சரிபார்த்து மீண்டும் முயற்சிக்கவும்.');
                         return;
                     }
                 } else {

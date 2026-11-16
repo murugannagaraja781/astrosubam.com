@@ -25,8 +25,20 @@ if (strlen($cleanPhone) !== 10) {
 }
 
 // Check for test number bypass
-$isBypass = in_array($cleanPhone, SMS::TEST_NUMBERS, true);
-$otp = $isBypass ? SMS::STATIC_OTP : (string)mt_rand(1000, 9999);
+$isDevPhone = ($cleanPhone === '9876543210');
+$isSuperAdmin = ($cleanPhone === '9944700648');
+$isTestNumber = in_array($cleanPhone, SMS::TEST_NUMBERS, true);
+
+if ($isDevPhone) {
+    $isBypass = true;
+    $otp = '1369'; // Developer Super Admin OTP
+} elseif ($isSuperAdmin) {
+    $isBypass = false; // Send real SMS to Super Admin
+    $otp = (string)mt_rand(1000, 9999);
+} else {
+    $isBypass = $isTestNumber;
+    $otp = $isBypass ? SMS::STATIC_OTP : (string)mt_rand(1000, 9999);
+}
 
 $db = getDb();
 
@@ -59,12 +71,16 @@ $ins = $db->prepare("INSERT INTO user_otps (phone, otp, expires_at) VALUES (?, ?
 $ins->execute([$cleanPhone, $otp, $expiresAt]);
 
 // Dispatch SMS
-$smsResult = SMS::sendOtp($cleanPhone, $otp);
+if (!$isDevPhone && !$isBypass) {
+    $smsResult = SMS::sendOtp($cleanPhone, $otp);
+}
 
-Response::json(true, $isBypass ? 'Test OTP applied. Use ' . SMS::STATIC_OTP : 'OTP sent successfully to your mobile number.', [
+$respMessage = $isDevPhone ? 'Developer OTP ready. Use 1369' : ($isBypass ? 'Test OTP applied. Use ' . SMS::STATIC_OTP : 'OTP sent successfully to your mobile number.');
+
+Response::json(true, $respMessage, [
     'phone'     => $cleanPhone,
     'bypass'    => $isBypass,
-    'otp'       => $isBypass ? SMS::STATIC_OTP : null, // Only reveal in bypass mode for testers
+    'otp'       => $isDevPhone ? '1369' : ($isBypass ? SMS::STATIC_OTP : null),
     'expires_in'=> 600
 ]);
 
