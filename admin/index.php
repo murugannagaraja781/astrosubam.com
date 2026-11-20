@@ -473,6 +473,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_astrologer'])) {
     }
 }
 
+// 3B. Action: Edit Astrologer Profile (Super Admin Edit Suite)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_astrologer'])) {
+    $id = (int)($_POST['astro_id'] ?? 0);
+    $name = trim($_POST['name'] ?? '');
+    $phone = preg_replace('/[^0-9]/', '', trim($_POST['phone'] ?? ''));
+    if (strlen($phone) > 10 && str_starts_with($phone, '91')) $phone = substr($phone, 2);
+    $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? '');
+    $specialities = trim($_POST['specialities'] ?? 'Vedic Astrology');
+    $languages = trim($_POST['languages'] ?? 'Tamil, English');
+    $experience = max(1, (int)($_POST['experience'] ?? 10));
+    $audioRate = max(5.0, (float)($_POST['audio_rate'] ?? 20));
+    $videoRate = max(10.0, (float)($_POST['video_rate'] ?? 30));
+    $chatRate = max(5.0, (float)($_POST['chat_rate'] ?? 10));
+    $isVideoEnabled = isset($_POST['is_video_enabled']) ? 1 : 0;
+    $callStatus = in_array($_POST['call_status'] ?? '', ['available', 'busy', 'offline'], true) ? $_POST['call_status'] : 'available';
+    $rating = max(1.0, min(5.0, (float)($_POST['rating'] ?? 5.0)));
+    $avatar = trim($_POST['avatar'] ?? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80');
+
+    if ($id > 0 && !empty($name) && !empty($phone)) {
+        // Check phone uniqueness excluding self
+        $chk = $db->prepare("SELECT id FROM astrologers WHERE phone = ? AND id != ?");
+        $chk->execute([$phone, $id]);
+        if ($chk->fetch()) {
+            $toastMessage = "❌ இந்த மொபைல் எண் ({$phone}) வேறு ஒரு ஜோதிடரால் பயன்படுத்தப்படுகிறது!";
+            $toastType = 'error';
+        } else {
+            if (!empty($password)) {
+                $pwdHash = password_hash($password, PASSWORD_BCRYPT);
+                $upd = $db->prepare("UPDATE astrologers SET 
+                    name = ?, phone = ?, email = ?, password_hash = ?, avatar = ?, languages = ?, 
+                    specialities = ?, experience_years = ?, audio_rate_min = ?, video_rate_min = ?, 
+                    chat_rate_min = ?, is_video_enabled = ?, call_status = ?, rating = ? 
+                    WHERE id = ?");
+                $upd->execute([$name, $phone, $email, $pwdHash, $avatar, $languages, $specialities, $experience, $audioRate, $videoRate, $chatRate, $isVideoEnabled, $callStatus, $rating, $id]);
+            } else {
+                $upd = $db->prepare("UPDATE astrologers SET 
+                    name = ?, phone = ?, email = ?, avatar = ?, languages = ?, 
+                    specialities = ?, experience_years = ?, audio_rate_min = ?, video_rate_min = ?, 
+                    chat_rate_min = ?, is_video_enabled = ?, call_status = ?, rating = ? 
+                    WHERE id = ?");
+                $upd->execute([$name, $phone, $email, $avatar, $languages, $specialities, $experience, $audioRate, $videoRate, $chatRate, $isVideoEnabled, $callStatus, $rating, $id]);
+            }
+            $toastMessage = "✅ ஜோதிடர் '{$name}' (ID: #{$id}) சுயவிவரம் வெற்றிகரமாக மாற்றப்பட்டது!";
+        }
+    } else {
+        $toastMessage = "❌ சரியான ஜோதிடர் ID, பெயர் மற்றும் மொபைல் எண் அவசியமானது!";
+        $toastType = 'error';
+    }
+}
+
 // 4. Action: Manual Wallet Recharge for Client
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recharge_user_wallet'])) {
     $userId = (int)$_POST['user_id'];
@@ -1442,10 +1493,133 @@ $activeTab = $_GET['tab'] ?? 'overview';
                                     <i data-lucide="<?= $videoOn ? 'video' : 'video-off' ?>" class="w-3.5 h-3.5"></i>
                                     <?= $videoOn ? '📹 Video ON' : '🚫 Video OFF' ?>
                                 </a>
+
+                                <!-- Super Admin Edit Profile Button -->
+                                <button type="button" onclick="openEditAstroModal(<?= htmlspecialchars(json_encode($astro), ENT_QUOTES, 'UTF-8') ?>)" class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-astro-gold/20 text-astro-gold border border-astro-gold/40 hover:bg-astro-gold hover:text-astro-base shadow-sm" title="சுயவிவரம் திருத்து (Edit Profile)">
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> ✏️ திருத்து (Edit)
+                                </button>
                             </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
+                </div>
+            </div>
+
+            <!-- EDIT ASTROLOGER MODAL (SUPER ADMIN EDIT SUITE) -->
+            <div id="editAstroModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+                <div class="glass-card max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-astro-gold/40 shadow-2xl relative my-8">
+                    <!-- Close Button -->
+                    <button type="button" onclick="closeEditAstroModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-astro-base/80 border border-astro-border text-white/70 hover:text-white hover:bg-astro-surface flex items-center justify-center transition">
+                        ✕
+                    </button>
+
+                    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-astro-border">
+                        <div class="w-12 h-12 rounded-2xl bg-astro-gold/20 border border-astro-gold flex items-center justify-center text-astro-gold">
+                            <i data-lucide="user-cog" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-cinzel text-lg sm:text-xl font-bold text-white">ஜோதிடர் சுயவிவரம் திருத்துதல்</h3>
+                            <p class="text-xs text-astro-gold" id="editModalSubTitle">Super Admin Astrologer Profile Editor</p>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="index.php?tab=astrologers" class="space-y-4 text-xs">
+                        <input type="hidden" name="edit_astrologer" value="1">
+                        <input type="hidden" name="astro_id" id="edit_astro_id" value="">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">ஜோதிடர் பெயர் (Full Name) *</label>
+                                <input type="text" name="name" id="edit_name" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-bold focus:outline-none focus:border-astro-gold">
+                            </div>
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">மொபைல் எண் (Mobile Phone) *</label>
+                                <input type="text" name="phone" id="edit_phone" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-astro-gold">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">மின்னஞ்சல் (Email Address)</label>
+                                <input type="email" name="email" id="edit_email" class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                            </div>
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">புதிய கடவுச்சொல் (New Password)</label>
+                                <input type="text" name="password" id="edit_password" placeholder="மாற்ற வேண்டாம் எனில் காலியாக விடவும்" class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white placeholder-white/30 focus:outline-none focus:border-astro-gold">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">அனுபவம் (Years Exp)</label>
+                                <input type="number" name="experience" id="edit_experience" min="1" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                            </div>
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">மதிப்பீடு (Rating 1.0 - 5.0)</label>
+                                <input type="number" step="0.01" min="1" max="5" name="rating" id="edit_rating" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-bold text-astro-gold focus:outline-none focus:border-astro-gold">
+                            </div>
+                            <div>
+                                <label class="block text-white/70 font-semibold mb-1">நிலை (Call Status)</label>
+                                <select name="call_status" id="edit_call_status" class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                                    <option value="available">● Available (நேரலை)</option>
+                                    <option value="busy">● Busy (ஆலோசனையில்)</option>
+                                    <option value="offline">● Offline (ஆஃப்லைன்)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-white/70 font-semibold mb-1">சிறப்பு நிபுணத்துவம் (Specialities) *</label>
+                            <input type="text" name="specialities" id="edit_specialities" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                        </div>
+
+                        <div>
+                            <label class="block text-white/70 font-semibold mb-1">தெரிந்த மொழிகள் (Languages) *</label>
+                            <input type="text" name="languages" id="edit_languages" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                        </div>
+
+                        <!-- Rate Cards (₹/min) -->
+                        <div class="grid grid-cols-3 gap-3 pt-1">
+                            <div>
+                                <label class="block text-[11px] font-bold text-astro-gold mb-1">Call Rate (₹/m)</label>
+                                <input type="number" step="1" name="audio_rate" id="edit_audio_rate" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-astro-emerald mb-1">Video Rate (₹/m)</label>
+                                <input type="number" step="1" name="video_rate" id="edit_video_rate" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-cyan-400 mb-1">Chat Rate (₹/m)</label>
+                                <input type="number" step="1" name="chat_rate" id="edit_chat_rate" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white font-bold text-center">
+                            </div>
+                        </div>
+
+                        <!-- Video Call Permission Toggle (Super Admin Discretion) -->
+                        <div class="p-3.5 rounded-2xl bg-astro-base border border-astro-border flex items-center justify-between">
+                            <div>
+                                <span class="font-bold text-white block text-xs flex items-center gap-1.5"><i data-lucide="video" class="w-4 h-4 text-astro-gold"></i> வீடியோ அழைப்பு அனுமதி (Video Consultation Permission)</span>
+                                <span class="text-[10px] text-white/50">இந்த ஜோதிடருக்கு பக்தர்கள் வீடியோ அழைப்பு செய்ய அனுமதிக்கவும்</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_video_enabled" id="edit_is_video_enabled" value="1" class="sr-only peer">
+                                <div class="w-11 h-6 bg-astro-surface peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-astro-emerald"></div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-white/70 font-semibold mb-1">புகைப்பட URL (Avatar Image URL)</label>
+                            <input type="url" name="avatar" id="edit_avatar" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-3 border-t border-astro-border">
+                            <button type="button" onclick="closeEditAstroModal()" class="px-5 py-2.5 rounded-xl border border-astro-border text-white/70 hover:text-white font-bold transition">
+                                ரத்து செய் (Cancel)
+                            </button>
+                            <button type="submit" class="btn-gold px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg">
+                                <i data-lucide="check" class="w-4 h-4"></i> மாற்றங்களை சேமி (Save Changes)
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             <?php endif; ?>
@@ -1970,6 +2144,35 @@ $activeTab = $_GET['tab'] ?? 'overview';
 
     <script>
         lucide.createIcons();
+
+        function openEditAstroModal(astro) {
+            if (!astro) return;
+            document.getElementById('edit_astro_id').value = astro.id || '';
+            document.getElementById('edit_name').value = astro.name || '';
+            document.getElementById('edit_phone').value = astro.phone || '';
+            document.getElementById('edit_email').value = astro.email || '';
+            document.getElementById('edit_password').value = '';
+            document.getElementById('edit_experience').value = astro.experience_years || 10;
+            document.getElementById('edit_rating').value = astro.rating || 5.0;
+            document.getElementById('edit_call_status').value = astro.call_status || 'available';
+            document.getElementById('edit_specialities').value = astro.specialities || '';
+            document.getElementById('edit_languages').value = astro.languages || '';
+            document.getElementById('edit_audio_rate').value = astro.audio_rate_min || 20;
+            document.getElementById('edit_video_rate').value = astro.video_rate_min || 30;
+            document.getElementById('edit_chat_rate').value = astro.chat_rate_min || 10;
+            document.getElementById('edit_avatar').value = astro.avatar || '';
+            
+            const isVid = astro.is_video_enabled == 1 || astro.is_video_enabled === true || astro.is_video_enabled === '1';
+            document.getElementById('edit_is_video_enabled').checked = isVid;
+
+            document.getElementById('editModalSubTitle').textContent = `Editing: ${astro.name} (ID: #${astro.id})`;
+            document.getElementById('editAstroModal').classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function closeEditAstroModal() {
+            document.getElementById('editAstroModal').classList.add('hidden');
+        }
     </script>
 </body>
 </html>
