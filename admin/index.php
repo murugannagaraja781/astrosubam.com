@@ -427,26 +427,49 @@ if (isset($_GET['toggle_astro_id'])) {
     exit;
 }
 
+// 2B. Action: Toggle Video Call Permission for Astrologer (Super Admin Discretion)
+if (isset($_GET['toggle_video_id'])) {
+    $astroId = (int)$_GET['toggle_video_id'];
+    $currentVideo = (int)($_GET['video_status'] ?? 1);
+    $newVideo = ($currentVideo === 1) ? 0 : 1;
+    $db->prepare("UPDATE astrologers SET is_video_enabled = ? WHERE id = ?")->execute([$newVideo, $astroId]);
+    header('Location: index.php?tab=astrologers');
+    exit;
+}
+
 // 3. Action: Add New Astrologer
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_astrologer'])) {
     $name = trim($_POST['name'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
+    $phone = preg_replace('/[^0-9]/', '', trim($_POST['phone'] ?? ''));
+    if (strlen($phone) > 10 && str_starts_with($phone, '91')) $phone = substr($phone, 2);
     $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? 'subam123');
     $specialities = trim($_POST['specialities'] ?? 'Vedic Astrology');
     $languages = trim($_POST['languages'] ?? 'Tamil, English');
     $experience = (int)($_POST['experience'] ?? 10);
     $audioRate = (float)($_POST['audio_rate'] ?? 20);
     $videoRate = (float)($_POST['video_rate'] ?? 30);
     $chatRate = (float)($_POST['chat_rate'] ?? 10);
+    $isVideoEnabled = isset($_POST['is_video_enabled']) ? 1 : 0;
     $avatar = trim($_POST['avatar'] ?? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80');
 
     if (!empty($name) && !empty($phone)) {
-        $pwd = password_hash('subam123', PASSWORD_BCRYPT);
-        $ins = $db->prepare("INSERT INTO astrologers 
-            (name, phone, email, password_hash, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, call_status, rating, total_reviews)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', 5.00, 1)");
-        $ins->execute([$name, $phone, $email, $pwd, $avatar, $languages, $specialities, $experience, $audioRate, $videoRate, $chatRate]);
-        $toastMessage = "✅ புதிய ஜோதிடர் '{$name}' வெற்றிகரமாக சேர்க்கப்பட்டார்!";
+        $chk = $db->prepare("SELECT id FROM astrologers WHERE phone = ?");
+        $chk->execute([$phone]);
+        if ($chk->fetch()) {
+            $toastMessage = "❌ இந்த மொபைல் எண் ({$phone}) ஏற்கனவே ஒரு ஜோதிடரால் பயன்படுத்தப்படுகிறது!";
+            $toastType = 'error';
+        } else {
+            $pwd = password_hash($password ?: 'subam123', PASSWORD_BCRYPT);
+            $ins = $db->prepare("INSERT INTO astrologers 
+                (name, phone, email, password_hash, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, is_video_enabled, call_status, rating, total_reviews)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', 5.00, 1)");
+            $ins->execute([$name, $phone, $email, $pwd, $avatar, $languages, $specialities, $experience, $audioRate, $videoRate, $chatRate, $isVideoEnabled]);
+            $toastMessage = "✅ புதிய ஜோதிடர் '{$name}' வெற்றிகரமாக சேர்க்கப்பட்டார்! (வீடியோ அழைப்பு: " . ($isVideoEnabled ? 'இயக்கப்பட்டது' : 'முடக்கப்பட்டது') . ")";
+        }
+    } else {
+        $toastMessage = "❌ ஜோதிடர் பெயர் மற்றும் மொபைல் எண் அவசியமானது!";
+        $toastType = 'error';
     }
 }
 
@@ -1309,21 +1332,31 @@ $activeTab = $_GET['tab'] ?? 'overview';
                 <!-- Add Astrologer Form (Left Column) -->
                 <div class="lg:col-span-5 glass-card p-6 rounded-2xl h-fit">
                     <h3 class="font-cinzel text-base font-bold text-astro-gold mb-4 flex items-center gap-2">
-                        <i data-lucide="user-plus" class="w-4 h-4"></i> புதிய ஜோதிடரை இணைக்க
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> புதிய ஜோதிடரை இணைக்க (Add Astrologer)
                     </h3>
                     <form method="POST" action="index.php?tab=astrologers" class="space-y-3 text-xs">
                         <div>
-                            <label class="block text-white/70 mb-1">ஜோதிடர் பெயர் (Astrologer Name)</label>
+                            <label class="block text-white/70 mb-1">ஜோதிடர் பெயர் (Astrologer Name) *</label>
                             <input type="text" name="name" placeholder="எ.கா: Acharya Ramanan Sarma" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-white/70 mb-1">மொபைல் எண்</label>
+                                <label class="block text-white/70 mb-1">மொபைல் எண் *</label>
                                 <input type="tel" name="phone" placeholder="9876543210" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
                             </div>
                             <div>
+                                <label class="block text-white/70 mb-1">மின்னஞ்சல் (Email)</label>
+                                <input type="email" name="email" placeholder="astro@astrosubam.com" class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-white/70 mb-1">கடவுச்சொல் (Password)</label>
+                                <input type="text" name="password" value="subam123" placeholder="subam123" class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                            </div>
+                            <div>
                                 <label class="block text-white/70 mb-1">அனுபவம் (ஆண்டுகள்)</label>
-                                <input type="number" name="experience" value="12" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                                <input type="number" name="experience" value="10" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
                             </div>
                         </div>
                         <div>
@@ -1332,7 +1365,7 @@ $activeTab = $_GET['tab'] ?? 'overview';
                         </div>
                         <div>
                             <label class="block text-white/70 mb-1">மொழிகள் (Languages)</label>
-                            <input type="text" name="languages" value="Tamil, English" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
+                            <input type="text" name="languages" value="Tamil, English, Hindi" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
                         </div>
                         <!-- Rate Cards -->
                         <div class="grid grid-cols-3 gap-2 pt-1">
@@ -1349,12 +1382,25 @@ $activeTab = $_GET['tab'] ?? 'overview';
                                 <input type="number" name="chat_rate" value="10" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2 text-white font-bold">
                             </div>
                         </div>
+
+                        <!-- Video Call Permission Toggle (Super Admin Choice) -->
+                        <div class="p-3 rounded-xl bg-astro-base border border-astro-border flex items-center justify-between">
+                            <div>
+                                <span class="font-bold text-white block text-xs flex items-center gap-1.5"><i data-lucide="video" class="w-3.5 h-3.5 text-astro-gold"></i> வீடியோ அழைப்பு அனுமதி (Video Call Permission)</span>
+                                <span class="text-[10px] text-white/50">இந்த ஜோதிடருக்கு வீடியோ அழைப்பை இயக்கவும்</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_video_enabled" value="1" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-astro-surface peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-astro-emerald"></div>
+                            </label>
+                        </div>
+
                         <div>
                             <label class="block text-white/70 mb-1">புகைப்பட URL (Avatar URL)</label>
                             <input type="url" name="avatar" value="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80" required class="w-full bg-astro-base border border-astro-border rounded-xl p-2.5 text-white focus:outline-none focus:border-astro-gold">
                         </div>
 
-                        <button type="submit" name="add_astrologer" class="btn-gold w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 mt-2">
+                        <button type="submit" name="add_astrologer" class="btn-gold w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 mt-2 shadow-lg">
                             <i data-lucide="plus-circle" class="w-4 h-4"></i> ஜோதிடரை இணைக்க (Add Astrologer)
                         </button>
                     </form>
@@ -1362,25 +1408,39 @@ $activeTab = $_GET['tab'] ?? 'overview';
 
                 <!-- Astrologers Directory List (Right Column) -->
                 <div class="lg:col-span-7 glass-card p-6 rounded-2xl">
-                    <h3 class="font-cinzel text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <i data-lucide="users" class="w-4 h-4 text-astro-gold"></i> பதிவுபெற்ற ஜோதிடர்கள் பட்டியல் (<?= count($astrologersList) ?>)
+                    <h3 class="font-cinzel text-base font-bold text-white mb-4 flex items-center justify-between">
+                        <span class="flex items-center gap-2"><i data-lucide="users" class="w-4 h-4 text-astro-gold"></i> பதிவுபெற்ற ஜோதிடர்கள் பட்டியல்</span>
+                        <span class="text-xs text-astro-gold px-2.5 py-1 rounded-lg bg-astro-base border border-astro-border font-mono"><?= count($astrologersList) ?> ஜோதிடர்கள்</span>
                     </h3>
                     <div class="space-y-3">
-                        <?php foreach ($astrologersList as $astro): ?>
-                        <div class="p-4 rounded-xl bg-astro-base/70 border border-astro-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <?php foreach ($astrologersList as $astro): 
+                            $videoOn = (int)($astro['is_video_enabled'] ?? 1) === 1;
+                        ?>
+                        <div class="p-4 rounded-xl bg-astro-base/70 border border-astro-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-astro-gold/40 transition">
                             <div class="flex items-center gap-3">
                                 <img src="<?= htmlspecialchars($astro['avatar']) ?>" alt="Avatar" class="w-12 h-12 rounded-xl object-cover border border-astro-gold">
                                 <div>
-                                    <h4 class="font-bold text-sm text-white font-cinzel"><?= htmlspecialchars($astro['name']) ?></h4>
+                                    <div class="flex items-center gap-2">
+                                        <h4 class="font-bold text-sm text-white font-cinzel"><?= htmlspecialchars($astro['name']) ?></h4>
+                                        <span class="text-[10px] text-white/50 font-mono">#<?= (int)$astro['id'] ?></span>
+                                    </div>
                                     <p class="text-[11px] text-astro-gold"><?= htmlspecialchars($astro['specialities']) ?></p>
-                                    <p class="text-[10px] text-white/50"><?= (int)$astro['experience_years'] ?> yrs exp • Call: ₹<?= (int)$astro['audio_rate_min'] ?>/m | Video: ₹<?= (int)$astro['video_rate_min'] ?>/m</p>
+                                    <p class="text-[10px] text-white/50"><?= (int)$astro['experience_years'] ?> yrs exp • Call: ₹<?= (int)$astro['audio_rate_min'] ?>/m | Video: <?= $videoOn ? '₹'.(int)$astro['video_rate_min'].'/m' : '<span class="text-red-400 font-bold">🚫 Disabled</span>' ?> | Chat: ₹<?= (int)$astro['chat_rate_min'] ?>/m</p>
+                                    <p class="text-[10px] text-astro-textMint">📱 <?= htmlspecialchars($astro['phone']) ?> • 🌐 <?= htmlspecialchars($astro['languages']) ?></p>
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2">
-                                <a href="?tab=astrologers&toggle_astro_id=<?= (int)$astro['id'] ?>&status=<?= htmlspecialchars($astro['call_status']) ?>" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 <?= $astro['call_status'] === 'available' ? 'bg-astro-emerald/20 text-astro-emerald border border-astro-emerald/40 hover:bg-red-500/20 hover:text-red-300' : 'bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-astro-emerald/20 hover:text-astro-emerald' ?>">
-                                    <span class="w-2 h-2 rounded-full <?= $astro['call_status'] === 'available' ? 'bg-astro-emerald' : 'bg-red-500' ?>"></span>
-                                    <?= $astro['call_status'] === 'available' ? 'Available (ஆன்லைன்)' : 'Busy (பிஸி)' ?>
+                            <div class="flex flex-wrap sm:flex-col items-end gap-1.5">
+                                <!-- Online / Busy Status Toggle -->
+                                <a href="?tab=astrologers&toggle_astro_id=<?= (int)$astro['id'] ?>&status=<?= htmlspecialchars($astro['call_status']) ?>" class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 <?= $astro['call_status'] === 'available' ? 'bg-astro-emerald/20 text-astro-emerald border border-astro-emerald/40 hover:bg-red-500/20 hover:text-red-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-astro-emerald/20 hover:text-astro-emerald' ?>">
+                                    <span class="w-2 h-2 rounded-full <?= $astro['call_status'] === 'available' ? 'bg-astro-emerald' : 'bg-amber-400' ?>"></span>
+                                    <?= $astro['call_status'] === 'available' ? 'Available' : 'Busy' ?>
+                                </a>
+
+                                <!-- Super Admin Video Call Permission Toggle -->
+                                <a href="?tab=astrologers&toggle_video_id=<?= (int)$astro['id'] ?>&video_status=<?= $videoOn ? 1 : 0 ?>" class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border <?= $videoOn ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-red-500/20 hover:text-red-300' : 'bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-emerald-500/20 hover:text-emerald-300' ?>" title="வீடியோ அழைப்பை மாற்றுக (Toggle Video Call)">
+                                    <i data-lucide="<?= $videoOn ? 'video' : 'video-off' ?>" class="w-3.5 h-3.5"></i>
+                                    <?= $videoOn ? '📹 Video ON' : '🚫 Video OFF' ?>
                                 </a>
                             </div>
                         </div>

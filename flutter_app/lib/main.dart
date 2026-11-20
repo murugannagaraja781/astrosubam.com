@@ -157,6 +157,156 @@ class AstroSubamApp extends StatelessWidget {
   }
 }
 
+// ==============================================================================
+// 🌟 ASTROLOCALE - TRI-LINGUAL LOCALIZATION (TAMIL, ENGLISH, HINDI)
+// ==============================================================================
+class AstroLocale {
+  static final ValueNotifier<String> currentLang = ValueNotifier<String>('ta'); // 'ta', 'en', 'hi'
+
+  static const Map<String, Map<String, String>> strings = {
+    'ta': {
+      'app_title': 'ASTROSUBAM',
+      'nav_home': 'முகப்பு',
+      'nav_astrologers': 'ஜோதிடர்கள்',
+      'nav_kundli': 'ராசிபலன்',
+      'nav_wallet': 'வாலட்',
+      'chat': 'சாட்',
+      'call': 'அழைப்பு',
+      'video': 'வீடியோ',
+      'video_na': 'Video N/A',
+      'video_disabled_msg': 'இந்த ஜோதிடருக்கு வீடியோ ஆலோசனை வசதி தற்போது முடக்கப்பட்டுள்ளது.',
+      'online_ready': 'Online & Ready',
+      'busy': 'In Consultation (Busy)',
+      'offline': 'Offline',
+      'recharge': 'Recharge Now',
+      'lang_switch_title': 'மொழியைத் தேர்ந்தெடுக்கவும்',
+      'lang_ta': '🇮🇳 தமிழ்',
+      'lang_en': '🇬🇧 English',
+      'lang_hi': '🇮🇳 हिन्दी',
+    },
+    'en': {
+      'app_title': 'ASTROSUBAM',
+      'nav_home': 'Home',
+      'nav_astrologers': 'Astrologers',
+      'nav_kundli': 'Kundli',
+      'nav_wallet': 'Wallet',
+      'chat': 'Chat',
+      'call': 'Call',
+      'video': 'Video',
+      'video_na': 'Video N/A',
+      'video_disabled_msg': 'Video consultation is currently disabled for this astrologer.',
+      'online_ready': 'Online & Ready',
+      'busy': 'In Consultation (Busy)',
+      'offline': 'Offline',
+      'recharge': 'Recharge Now',
+      'lang_switch_title': 'Choose Language',
+      'lang_ta': '🇮🇳 தமிழ்',
+      'lang_en': '🇬🇧 English',
+      'lang_hi': '🇮🇳 हिन्दी',
+    },
+    'hi': {
+      'app_title': 'ASTROSUBAM',
+      'nav_home': 'होम',
+      'nav_astrologers': 'ज्योतिषी',
+      'nav_kundli': 'कुंडली',
+      'nav_wallet': 'वॉलेट',
+      'chat': 'चैट',
+      'call': 'कॉल',
+      'video': 'वीडियो',
+      'video_na': 'Video N/A',
+      'video_disabled_msg': 'इस ज्योतिषी के लिए वीडियो परामर्श वर्तमान में अक्षम है।',
+      'online_ready': 'Online & Ready',
+      'busy': 'In Consultation (Busy)',
+      'offline': 'Offline',
+      'recharge': 'Recharge Now',
+      'lang_switch_title': 'भाषा चुनें',
+      'lang_ta': '🇮🇳 தமிழ்',
+      'lang_en': '🇬🇧 English',
+      'lang_hi': '🇮🇳 हिन्दी',
+    },
+  };
+
+  static String t(String key) {
+    final lang = currentLang.value;
+    return strings[lang]?[key] ?? strings['en']?[key] ?? key;
+  }
+
+  static void setLang(String lang) {
+    if (strings.containsKey(lang)) {
+      currentLang.value = lang;
+    }
+  }
+
+  static void showLanguageSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AstroTheme.forestSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => ValueListenableBuilder<String>(
+        valueListenable: currentLang,
+        builder: (context, activeLang, _) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.language, color: AstroTheme.solarYellow, size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      t('lang_switch_title'),
+                      style: const TextStyle(
+                        color: AstroTheme.solarYellow,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _langTile(ctx, 'ta', '🇮🇳 தமிழ் (Tamil)', activeLang == 'ta'),
+                _langTile(ctx, 'en', '🇬🇧 English', activeLang == 'en'),
+                _langTile(ctx, 'hi', '🇮🇳 हिन्दी (Hindi)', activeLang == 'hi'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _langTile(BuildContext context, String code, String label, bool isSelected) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? AstroTheme.jadeContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? AstroTheme.solarYellow : AstroTheme.borderSubtle,
+        ),
+      ),
+      child: ListTile(
+        title: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? AstroTheme.solarYellow : Colors.white,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        trailing: isSelected ? const Icon(Icons.check_circle, color: AstroTheme.solarYellow) : null,
+        onTap: () {
+          setLang(code);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
 // App State Manager
 class UserState {
   static bool isLoggedIn = false;
@@ -180,6 +330,7 @@ class UserState {
       'audioRate': 20.0,
       'videoRate': 35.0,
       'chatRate': 12.0,
+      'is_video_enabled': true,
       'status': 'offline',
       'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
@@ -195,6 +346,7 @@ class UserState {
       'audioRate': 18.0,
       'videoRate': 30.0,
       'chatRate': 10.0,
+      'is_video_enabled': true,
       'status': 'offline',
       'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
@@ -210,6 +362,7 @@ class UserState {
       'audioRate': 15.0,
       'videoRate': 25.0,
       'chatRate': 10.0,
+      'is_video_enabled': true,
       'status': 'offline',
       'call_status': 'offline',
       'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
@@ -237,6 +390,7 @@ class UserState {
             'audioRate': safeDouble(m['audio_rate_min'], 20.0),
             'videoRate': safeDouble(m['video_rate_min'], 30.0),
             'chatRate': safeDouble(m['chat_rate_min'], 10.0),
+            'is_video_enabled': m['is_video_enabled'] == true || m['is_video_enabled'] == 1 || m['is_video_enabled'] == '1',
             'status': rawStatus,
             'call_status': rawStatus,
             'image': m['avatar']?.toString() ?? 'assets/logo.jpg',
@@ -489,6 +643,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Language / மொழி',
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                border: Border.all(color: AstroTheme.solarYellow.withAlpha(160)),
+                borderRadius: BorderRadius.circular(6),
+                color: AstroTheme.forestSurface,
+              ),
+              child: ValueListenableBuilder<String>(
+                valueListenable: AstroLocale.currentLang,
+                builder: (_, lang, __) => Text(
+                  lang.toUpperCase(),
+                  style: const TextStyle(
+                    color: AstroTheme.solarYellow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            onPressed: () => AstroLocale.showLanguageSelector(context),
+          ),
           IconButton(
             tooltip: UserState.isLoggedIn ? UserState.userName : 'Login with Mobile OTP',
             icon: Icon(
@@ -1189,26 +1366,54 @@ class AstrologerCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isOnline ? AstroTheme.solarYellow : Colors.white60,
-                      backgroundColor: isOnline ? AstroTheme.solarYellow.withAlpha(25) : Colors.transparent,
-                      side: BorderSide(color: isOnline ? AstroTheme.solarYellow : Colors.white24),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      minimumSize: const Size(0, 44),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                    ),
-                    onPressed: () => _startConsultation(context, 'video', videoRate),
-                    icon: const Icon(Icons.videocam, size: 15),
-                    label: Text(
-                      'Video ₹${videoRate.toInt()}/m',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
+                  child: (astrologer['is_video_enabled'] != false && astrologer['is_video_enabled'] != 0)
+                      ? OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: isOnline ? AstroTheme.solarYellow : Colors.white60,
+                            backgroundColor: isOnline ? AstroTheme.solarYellow.withAlpha(25) : Colors.transparent,
+                            side: BorderSide(color: isOnline ? AstroTheme.solarYellow : Colors.white24),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            minimumSize: const Size(0, 44),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          ),
+                          onPressed: () => _startConsultation(context, 'video', videoRate),
+                          icon: const Icon(Icons.videocam, size: 15),
+                          label: Text(
+                            'Video ₹${videoRate.toInt()}/m',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white30,
+                            backgroundColor: Colors.transparent,
+                            side: const BorderSide(color: Colors.white12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            minimumSize: const Size(0, 44),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          ),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(AstroLocale.t('video_disabled_msg')),
+                                backgroundColor: Colors.amber.shade900,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.videocam_off, size: 15, color: Colors.white30),
+                          label: Text(
+                            AstroLocale.t('video_na'),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white38,
+                            ),
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -1220,6 +1425,17 @@ class AstrologerCard extends StatelessWidget {
 
   void _startConsultation(BuildContext context, String type, double ratePerMin) {
     if (_isCallInitiating) return;
+
+    final bool isVideoEnabled = astrologer['is_video_enabled'] != false && astrologer['is_video_enabled'] != 0;
+    if (type == 'video' && !isVideoEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AstroLocale.t('video_disabled_msg')),
+          backgroundColor: Colors.amber.shade900,
+        ),
+      );
+      return;
+    }
 
     const double minMinutes = 5.0;
     final double minRequired = ratePerMin * minMinutes;

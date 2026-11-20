@@ -28,13 +28,13 @@ if ($userId <= 0) {
 $db = getDb();
 
 // 1. Fetch Astrologer
-$stmt = $db->prepare("SELECT id, name, phone, audio_rate_min, video_rate_min, chat_rate_min, call_status FROM astrologers WHERE id = ?");
+$stmt = $db->prepare("SELECT id, name, phone, audio_rate_min, video_rate_min, chat_rate_min, call_status, is_video_enabled FROM astrologers WHERE id = ?");
 $stmt->execute([$astrologerId]);
 $astro = $stmt->fetch();
 
 if (!$astro) {
     // If id not found, fallback to first astrologer
-    $fStmt = $db->query("SELECT id, name, phone, audio_rate_min, video_rate_min, chat_rate_min, call_status FROM astrologers LIMIT 1");
+    $fStmt = $db->query("SELECT id, name, phone, audio_rate_min, video_rate_min, chat_rate_min, call_status, is_video_enabled FROM astrologers LIMIT 1");
     $astro = $fStmt->fetch();
     if ($astro) {
         $astrologerId = (int)$astro['id'];
@@ -45,6 +45,10 @@ if (!$astro) {
 
 if (($astro['call_status'] ?? '') === 'offline') {
     Response::json(false, "Astrologer {$astro['name']} is currently offline. Please check their schedule.", null, 409);
+}
+
+if ($type === 'video' && isset($astro['is_video_enabled']) && (int)$astro['is_video_enabled'] === 0) {
+    Response::json(false, "Astrologer {$astro['name']} does not currently offer video consultations. Please choose audio call or chat.", null, 400);
 }
 
 $rate = ($type === 'video') ? (float)$astro['video_rate_min'] : (($type === 'chat') ? (float)$astro['chat_rate_min'] : (float)$astro['audio_rate_min']);

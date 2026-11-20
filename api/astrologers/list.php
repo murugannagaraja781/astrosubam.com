@@ -7,7 +7,7 @@ $db = getDb();
 $status = $_GET['status'] ?? 'all'; // available | all
 $search = $_GET['search'] ?? '';
 
-$sql = "SELECT id, name, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, call_status, rating, total_reviews 
+$sql = "SELECT id, name, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, is_video_enabled, call_status, rating, total_reviews 
         FROM astrologers WHERE status = 'approved'";
 $params = [];
 
@@ -39,6 +39,7 @@ foreach ($rows as $a) {
         'audio_rate_min'   => (float)($a['audio_rate_min'] ?? 20.0),
         'video_rate_min'   => (float)($a['video_rate_min'] ?? 30.0),
         'chat_rate_min'    => (float)($a['chat_rate_min'] ?? 10.0),
+        'is_video_enabled' => (bool)((int)($a['is_video_enabled'] ?? 1) === 1),
         'call_status'      => strtolower(trim((string)($a['call_status'] ?? 'offline'))),
         'rating'           => (float)($a['rating'] ?? 4.9),
         'total_reviews'    => (int)($a['total_reviews'] ?? 100),

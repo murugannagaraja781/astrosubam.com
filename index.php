@@ -225,15 +225,15 @@ try {
         <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2 text-astro-gold">
                 <i data-lucide="sparkles" class="w-3.5 h-3.5 animate-spin"></i>
-                <span class="font-bold tracking-wide">இன்றைய சுப முகூர்த்த நேரம்:</span>
-                <span class="text-white/90">காலை 09:15 AM - 10:15 AM | கௌரி நல்ல நேரம்: 01:30 PM - 02:30 PM</span>
+                <span class="font-bold tracking-wide" data-i18n="muhurtham_title">இன்றைய சுப முகூர்த்த நேரம்:</span>
+                <span class="text-white/90" data-i18n="muhurtham_timing">காலை 09:15 AM - 10:15 AM | கௌரி நல்ல நேரம்: 01:30 PM - 02:30 PM</span>
             </div>
             <div class="flex items-center gap-4 text-white/80">
                 <span class="hidden md:inline-flex items-center gap-1 text-astro-textMint">
-                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-astro-gold"></i> 100% ரகசியத்தன்மை & பாதுகாப்பான சேவை
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-astro-gold"></i> <span data-i18n="safe_service">100% ரகசியத்தன்மை & பாதுகாப்பான சேவை</span>
                 </span>
                 <a href="#astrologers" class="text-astro-gold hover:underline font-semibold flex items-center gap-1">
-                    இப்போதே ஆலோசனை பெறுக <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                    <span data-i18n="consult_now">இப்போதே ஆலோசனை பெறுக</span> <i data-lucide="chevron-right" class="w-3 h-3"></i>
                 </a>
             </div>
         </div>
@@ -252,33 +252,45 @@ try {
                         <span class="font-cinzel text-2xl font-bold tracking-wider text-astro-gold gold-text-glow">ASTROSUBAM</span>
                         <span class="bg-astro-gold/20 text-astro-gold text-[10px] font-bold px-2 py-0.5 rounded-full border border-astro-gold/40">VEDIC</span>
                     </div>
-                    <p class="text-xs text-astro-textMint font-tamil tracking-wide">நல்வழி காட்டும் வேத ஜோதிட வழிகாட்டல்</p>
+                    <p class="text-xs text-astro-textMint font-tamil tracking-wide" data-i18n="tagline">நல்வழி காட்டும் வேத ஜோதிட வழிகாட்டல்</p>
                 </div>
             </a>
 
             <!-- Desktop Nav Links -->
             <nav class="hidden lg:flex items-center gap-7 text-sm font-medium">
                 <a href="#astrologers" class="text-white/90 hover:text-astro-gold transition flex items-center gap-1.5">
-                    <i data-lucide="users" class="w-4 h-4 text-astro-emerald"></i> ஜோதிடர்கள் (Astrologers)
+                    <i data-lucide="users" class="w-4 h-4 text-astro-emerald"></i> <span data-i18n="nav_astrologers">ஜோதிடர்கள் (Astrologers)</span>
                 </a>
                 <a href="#panchangam" class="text-white/90 hover:text-astro-gold transition flex items-center gap-1.5">
-                    <i data-lucide="sun" class="w-4 h-4 text-astro-gold"></i> பஞ்சாங்கம் & ராசிபலன்
+                    <i data-lucide="sun" class="w-4 h-4 text-astro-gold"></i> <span data-i18n="nav_panchangam">பஞ்சாங்கம் & ராசிபலன்</span>
                 </a>
                 <a href="#services" class="text-white/90 hover:text-astro-gold transition flex items-center gap-1.5">
-                    <i data-lucide="sparkles" class="w-4 h-4 text-astro-emerald"></i> சேவைகள்
+                    <i data-lucide="sparkles" class="w-4 h-4 text-astro-emerald"></i> <span data-i18n="nav_services">சேவைகள்</span>
                 </a>
                 <a href="admin/settings.php" target="_blank" class="text-white/60 hover:text-astro-gold transition text-xs flex items-center gap-1">
                     <i data-lucide="settings" class="w-3.5 h-3.5"></i> Admin
                 </a>
             </nav>
 
-            <!-- Wallet & User Actions -->
+            <!-- Wallet, Language & User Actions -->
             <div class="flex items-center gap-3">
+                <!-- Multi-Language Selector (Tamil / English / Hindi) -->
+                <div class="relative flex items-center">
+                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-astro-surface border border-astro-gold/40 hover:border-astro-gold transition shadow-sm">
+                        <i data-lucide="globe" class="w-3.5 h-3.5 text-astro-gold"></i>
+                        <select onchange="setLanguage(this.value)" class="lang-selector bg-transparent text-astro-gold font-bold text-xs focus:outline-none cursor-pointer">
+                            <option value="ta" class="bg-astro-surface text-white">🇮🇳 தமிழ்</option>
+                            <option value="en" class="bg-astro-surface text-white">🇬🇧 English</option>
+                            <option value="hi" class="bg-astro-surface text-white">🇮🇳 हिन्दी</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Live Wallet Chip -->
                 <button onclick="openWalletModal()" class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-astro-surface border border-astro-gold/40 hover:border-astro-gold transition shadow-sm hover:shadow-glow-gold/30">
                     <i data-lucide="wallet" class="w-4 h-4 text-astro-gold"></i>
                     <div class="text-left text-xs">
-                        <span class="text-white/60 text-[10px] block leading-none">Wallet</span>
+                        <span class="text-white/60 text-[10px] block leading-none" data-i18n="nav_wallet">Wallet</span>
                         <span id="nav-wallet-balance" class="text-astro-gold font-bold text-sm">₹500.00</span>
                     </div>
                     <span class="w-5 h-5 rounded-full bg-astro-gold/20 flex items-center justify-center text-astro-gold text-xs font-bold ml-1">+</span>
@@ -287,7 +299,7 @@ try {
                 <!-- Auth / Login Button -->
                 <button onclick="openAuthModal()" id="btn-user-auth" class="btn-gold px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5">
                     <i data-lucide="user" class="w-4 h-4"></i>
-                    <span id="user-display-name">உள்நுழைக</span>
+                    <span id="user-display-name" data-i18n="nav_login">உள்நுழைக</span>
                 </button>
 
                 <!-- Mobile Menu Button -->
@@ -299,12 +311,22 @@ try {
 
         <!-- Mobile Drawer Menu -->
         <div id="mobile-menu" class="hidden lg:hidden border-t border-astro-emerald/20 bg-astro-surface/95 px-6 py-4 space-y-3">
-            <a href="#astrologers" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">🌟 ஜோதிடர்கள் பட்டியல்</a>
-            <a href="#panchangam" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">📅 இன்றைய பஞ்சாங்கம் & ராசிபலன்</a>
-            <a href="#services" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold">🔮 ஆலோசனைகள் & பரிகாரங்கள்</a>
+            <div class="flex items-center justify-between py-2 border-b border-astro-emerald/20">
+                <span class="text-xs text-astro-textMint flex items-center gap-1.5">
+                    <i data-lucide="globe" class="w-4 h-4 text-astro-gold"></i> மொழி / Language:
+                </span>
+                <select onchange="setLanguage(this.value)" class="lang-selector bg-astro-base text-astro-gold font-bold text-xs px-3 py-1.5 rounded-lg border border-astro-gold/40 focus:outline-none">
+                    <option value="ta" class="bg-astro-surface text-white">🇮🇳 தமிழ்</option>
+                    <option value="en" class="bg-astro-surface text-white">🇬🇧 English</option>
+                    <option value="hi" class="bg-astro-surface text-white">🇮🇳 हिन्दी</option>
+                </select>
+            </div>
+            <a href="#astrologers" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold" data-i18n="nav_astrologers">🌟 ஜோதிடர்கள் பட்டியல்</a>
+            <a href="#panchangam" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold" data-i18n="nav_panchangam">📅 இன்றைய பஞ்சாங்கம் & ராசிபலன்</a>
+            <a href="#services" onclick="toggleMobileMenu()" class="block py-2 text-white font-medium hover:text-astro-gold" data-i18n="nav_services">🔮 ஆலோசனைகள் & பரிகாரங்கள்</a>
             <button onclick="toggleMobileMenu(); openAuthModal();" class="w-full text-left py-2.5 text-astro-gold font-bold flex items-center gap-2 border-y border-astro-emerald/20 my-1">
                 <i data-lucide="user" class="w-4 h-4"></i>
-                <span id="mobile-user-display-name">பக்தர் உள்நுழைவு (Login)</span>
+                <span id="mobile-user-display-name" data-i18n="nav_login">பக்தர் உள்நுழைவு (Login)</span>
             </button>
             <a href="astrologer/" class="block py-2 text-emerald-400 hover:text-emerald-300 font-semibold text-xs">🧙‍♂️ ஜோதிடர் போர்டல் (Astrologer Portal) &rarr;</a>
             <a href="admin/settings.php" class="block py-2 text-white/60 hover:text-astro-gold text-xs">⚙️ Super Admin Settings</a>
@@ -502,23 +524,23 @@ try {
             <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
                 <div>
                     <div class="inline-flex items-center gap-2 text-astro-gold text-xs font-bold tracking-widest uppercase mb-2">
-                        <i data-lucide="stars" class="w-4 h-4"></i> VERIFIED VEDIC ASTROLOGERS
+                        <i data-lucide="stars" class="w-4 h-4"></i> <span data-i18n="astrologers_badge">VERIFIED VEDIC ASTROLOGERS</span>
                     </div>
                     <h2 class="font-cinzel text-2xl sm:text-4xl font-extrabold text-white">
-                        அனுபவமிக்க <span class="text-transparent bg-clip-text bg-gradient-to-r from-astro-gold to-astro-goldAmber">ஜோதிட நிபுணர்கள்</span>
+                        <span data-i18n="astrologers_title">அனுபவமிக்க</span> <span class="text-transparent bg-clip-text bg-gradient-to-r from-astro-gold to-astro-goldAmber" data-i18n="astrologers_title_highlight">ஜோதிட நிபுணர்கள்</span>
                     </h2>
-                    <p class="text-xs sm:text-sm text-astro-textMint mt-1 font-tamil">
+                    <p class="text-xs sm:text-sm text-astro-textMint mt-1 font-tamil" data-i18n="astrologers_subtitle">
                         உங்கள் வாழ்க்கைப் பிரச்னைகளுக்கு உரிய எளிய பரிகாரங்கள் & சரியான வழிகாட்டல்
                     </p>
                 </div>
 
                 <!-- Filter Pills -->
                 <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="filterAstrologers('all')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-astro-gold text-astro-base transition">அனைத்தும்</button>
-                    <button onclick="filterAstrologers('vedic')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition">வேத ஜோதிடம்</button>
-                    <button onclick="filterAstrologers('kp')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition">KP முறை</button>
-                    <button onclick="filterAstrologers('nadi')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition">நாடி ஜோதிடம்</button>
-                    <button onclick="filterAstrologers('prasanna')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition">பிரசன்னம்</button>
+                    <button onclick="filterAstrologers('all')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-astro-gold text-astro-base transition" data-i18n="filter_all">அனைத்தும்</button>
+                    <button onclick="filterAstrologers('vedic')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition" data-i18n="filter_vedic">வேத ஜோதிடம்</button>
+                    <button onclick="filterAstrologers('kp')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition" data-i18n="filter_kp">KP முறை</button>
+                    <button onclick="filterAstrologers('nadi')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition" data-i18n="filter_nadi">நாடி ஜோதிடம்</button>
+                    <button onclick="filterAstrologers('prasanna')" class="astro-filter-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-astro-surface border border-astro-emerald/30 text-white/80 hover:border-astro-gold transition" data-i18n="filter_prasanna">பிரசன்னம்</button>
                 </div>
             </div>
 
@@ -539,6 +561,7 @@ try {
                     $id = (int)$astro['id'];
                     $isOnline = ($status === 'available');
                     $isBusy = ($status === 'busy');
+                    $isVideoEnabled = (int)($astro['is_video_enabled'] ?? 1) === 1;
                 ?>
                 <div id="astro-card-<?= $id ?>" class="glass-card rounded-2xl p-5 relative border border-astro-emerald/20 flex flex-col justify-between group <?= $isOnline ? '' : 'opacity-80' ?>" data-category="<?= strtolower($specialities) ?>" data-status="<?= $status ?>">
                     <!-- Card Header: Avatar & Info -->
@@ -559,22 +582,22 @@ try {
                                     </span>
                                 </div>
                                 <p class="text-xs text-astro-gold font-medium truncate mt-0.5"><?= $specialities ?></p>
-                                <p class="text-xs text-white/60 mt-0.5"><?= $exp ?> ஆண்டுகள் • <?= $languages ?></p>
+                                <p class="text-xs text-white/60 mt-0.5"><?= $exp ?> <span data-i18n="years">ஆண்டுகள்</span> • <?= $languages ?></p>
                                 
                                 <div class="flex items-center gap-2 mt-2">
                                     <span class="flex items-center gap-1 text-xs text-astro-gold font-bold bg-astro-gold/10 px-2 py-0.5 rounded-md border border-astro-gold/30">
                                         <i data-lucide="star" class="w-3 h-3 fill-astro-gold"></i> <?= $rating ?>
                                     </span>
-                                    <span class="text-[11px] text-white/50"><?= $reviews ?>+ ஆலோசனைகள்</span>
+                                    <span class="text-[11px] text-white/50"><?= $reviews ?>+ <span data-i18n="consultations">ஆலோசனைகள்</span></span>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Highlights Tags -->
                         <div class="flex flex-wrap gap-1.5 my-3 text-[11px]">
-                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint">துல்லிய கணிப்பு</span>
-                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint">நேரடி தீர்வு</span>
-                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint">100% ரகசியம்</span>
+                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint" data-i18n="tag_accurate">துல்லிய கணிப்பு</span>
+                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint" data-i18n="tag_direct">நேரடி தீர்வு</span>
+                            <span class="px-2 py-0.5 rounded-md bg-astro-base/80 border border-astro-emerald/25 text-astro-textMint" data-i18n="tag_secret">100% ரகசியம்</span>
                         </div>
                     </div>
 
@@ -584,23 +607,31 @@ try {
                             <!-- Chat Button -->
                             <button onclick="startConsultation(<?= $id ?>, 'Chat', <?= $chatRate ?>, '<?= addslashes($name) ?>')" class="btn-emerald py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5">
                                 <i data-lucide="message-square" class="w-3.5 h-3.5 text-astro-gold"></i>
-                                <span>சாட்</span>
-                                <span class="text-[10px] text-astro-gold font-semibold">₹<?= $chatRate ?>/நிமி</span>
+                                <span data-i18n="chat">சாட்</span>
+                                <span class="text-[10px] text-astro-gold font-semibold">₹<?= $chatRate ?>/<span data-i18n="per_min">நிமி</span></span>
                             </button>
 
                             <!-- Audio Call Button -->
                             <button onclick="startConsultation(<?= $id ?>, 'Audio', <?= $audioRate ?>, '<?= addslashes($name) ?>')" class="btn-gold py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5">
                                 <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                                <span>அழைப்பு</span>
-                                <span class="text-[10px] text-astro-base font-extrabold">₹<?= $audioRate ?>/நிமி</span>
+                                <span data-i18n="call">அழைப்பு</span>
+                                <span class="text-[10px] text-astro-base font-extrabold">₹<?= $audioRate ?>/<span data-i18n="per_min">நிமி</span></span>
                             </button>
 
                             <!-- Video Call Button -->
-                            <button onclick="startConsultation(<?= $id ?>, 'Video', <?= $videoRate ?>, '<?= addslashes($name) ?>')" class="btn-emerald py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5">
+                            <?php if ($isVideoEnabled): ?>
+                            <button id="astro-btn-video-<?= $id ?>" onclick="startConsultation(<?= $id ?>, 'Video', <?= $videoRate ?>, '<?= addslashes($name) ?>')" class="btn-emerald py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5">
                                 <i data-lucide="video" class="w-3.5 h-3.5 text-astro-gold"></i>
-                                <span>வீடியோ</span>
-                                <span class="text-[10px] text-astro-gold font-semibold">₹<?= $videoRate ?>/நிமி</span>
+                                <span data-i18n="video">வீடியோ</span>
+                                <span class="text-[10px] text-astro-gold font-semibold">₹<?= $videoRate ?>/<span data-i18n="per_min">நிமி</span></span>
                             </button>
+                            <?php else: ?>
+                            <button id="astro-btn-video-<?= $id ?>" disabled title="இந்த ஜோதிடருக்கு வீடியோ ஆலோசனை வசதி தற்போது முடக்கப்பட்டுள்ளது" class="py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 bg-gray-800/80 border border-gray-700/60 opacity-50 cursor-not-allowed text-gray-400">
+                                <i data-lucide="video-off" class="w-3.5 h-3.5 text-gray-500"></i>
+                                <span data-i18n="video_na">வீடியோ N/A</span>
+                                <span class="text-[9px] text-gray-500 font-medium" data-i18n="disabled">முடக்கப்பட்டது</span>
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -1138,8 +1169,148 @@ try {
             return '/api' + p;
         }
 
+        // ==============================================
+        // 🌐 TRI-LINGUAL LOCALIZATION (TAMIL, ENGLISH, HINDI)
+        // ==============================================
+        const astroTranslations = {
+            ta: {
+                muhurtham_title: "இன்றைய சுப முகூர்த்த நேரம்:",
+                muhurtham_timing: "காலை 09:15 AM - 10:15 AM | கௌரி நல்ல நேரம்: 01:30 PM - 02:30 PM",
+                safe_service: "100% ரகசியத்தன்மை & பாதுகாப்பான சேவை",
+                consult_now: "இப்போதே ஆலோசனை பெறுக",
+                tagline: "நல்வழி காட்டும் வேத ஜோதிட வழிகாட்டல்",
+                nav_astrologers: "ஜோதிடர்கள் (Astrologers)",
+                nav_panchangam: "பஞ்சாங்கம் & ராசிபலன்",
+                nav_services: "சேவைகள்",
+                nav_login: "உள்நுழைக",
+                nav_wallet: "Wallet",
+                astrologers_badge: "VERIFIED VEDIC ASTROLOGERS",
+                astrologers_title: "அனுபவமிக்க",
+                astrologers_title_highlight: "ஜோதிட நிபுணர்கள்",
+                astrologers_subtitle: "உங்கள் வாழ்க்கைப் பிரச்னைகளுக்கு உரிய எளிய பரிகாரங்கள் & சரியான வழிகாட்டல்",
+                filter_all: "அனைத்தும்",
+                filter_vedic: "வேத ஜோதிடம்",
+                filter_kp: "KP முறை",
+                filter_nadi: "நாடி ஜோதிடம்",
+                filter_prasanna: "பிரசன்னம்",
+                years: "ஆண்டுகள்",
+                consultations: "ஆலோசனைகள்",
+                tag_accurate: "துல்லிய கணிப்பு",
+                tag_direct: "நேரடி தீர்வு",
+                tag_secret: "100% ரகசியம்",
+                chat: "சாட்",
+                call: "அழைப்பு",
+                video: "வீடியோ",
+                video_na: "வீடியோ N/A",
+                disabled: "முடக்கப்பட்டது",
+                per_min: "நிமி",
+                online_status: "● நேரலை (Online)",
+                busy_status: "● ஆலோசனையில்",
+                offline_status: "● ஆஃப்லைன் (Offline)"
+            },
+            en: {
+                muhurtham_title: "Today's Auspicious Muhurtham:",
+                muhurtham_timing: "Morning 09:15 AM - 10:15 AM | Gowri Nalla Neram: 01:30 PM - 02:30 PM",
+                safe_service: "100% Confidential & Secure Service",
+                consult_now: "Consult Now",
+                tagline: "Vedic Astrology Life Guidance",
+                nav_astrologers: "Astrologers",
+                nav_panchangam: "Panchangam & Horoscope",
+                nav_services: "Services",
+                nav_login: "Login",
+                nav_wallet: "Wallet",
+                astrologers_badge: "VERIFIED VEDIC ASTROLOGERS",
+                astrologers_title: "Tamil Nadu's Most Trusted",
+                astrologers_title_highlight: "Vedic Astrologers",
+                astrologers_subtitle: "Instant consultations for Horoscope, Marriage Matching, Prasannam, and Dosha Remedies",
+                filter_all: "All",
+                filter_vedic: "Vedic Astrology",
+                filter_kp: "KP System",
+                filter_nadi: "Nadi Astrology",
+                filter_prasanna: "Prasannam",
+                years: "years",
+                consultations: "consultations",
+                tag_accurate: "Accurate Prediction",
+                tag_direct: "Direct Remedy",
+                tag_secret: "100% Private",
+                chat: "Chat",
+                call: "Call",
+                video: "Video",
+                video_na: "Video N/A",
+                disabled: "Disabled",
+                per_min: "min",
+                online_status: "● Online",
+                busy_status: "● In Consultation",
+                offline_status: "● Offline"
+            },
+            hi: {
+                muhurtham_title: "आज का शुभ मुहूर्त:",
+                muhurtham_timing: "प्रातः 09:15 AM - 10:15 AM | गौरी शुभ समय: 01:30 PM - 02:30 PM",
+                safe_service: "100% गोपनीय और सुरक्षित परामर्श",
+                consult_now: "अभी परामर्श लें",
+                tagline: "वैदिक ज्योतिष जीवन मार्गदर्शन",
+                nav_astrologers: "ज्योतिषी (Astrologers)",
+                nav_panchangam: "पंचांग और राशिफल",
+                nav_services: "सेवाएं",
+                nav_login: "लॉग इन",
+                nav_wallet: "वॉलेट",
+                astrologers_badge: "VERIFIED VEDIC ASTROLOGERS",
+                astrologers_title: "भारत के सर्वश्रेष्ठ एवं विश्वसनीय",
+                astrologers_title_highlight: "वैदिक ज्योतिषी",
+                astrologers_subtitle: "कुंडली, विवाह मिलान, प्रश्न कुंडली और दोष निवारण के लिए तुरंत परामर्श प्राप्त करें",
+                filter_all: "सभी",
+                filter_vedic: "वैदिक ज्योतिष",
+                filter_kp: "केपी पद्धति",
+                filter_nadi: "नाड़ी ज्योतिष",
+                filter_prasanna: "प्रश्न कुंडली",
+                years: "वर्ष",
+                consultations: "परामर्श",
+                tag_accurate: "सटीक गणना",
+                tag_direct: "सीधा उपाय",
+                tag_secret: "100% गोपनीय",
+                chat: "चैट",
+                call: "कॉल",
+                video: "वीडियो",
+                video_na: "वीडियो अनुपलब्ध",
+                disabled: "अक्षम",
+                per_min: "मिनट",
+                online_status: "● ऑनलाइन (Online)",
+                busy_status: "● परामर्श में व्यस्त",
+                offline_status: "● ऑफ़लाइन (Offline)"
+            }
+        };
+
+        let currentLang = localStorage.getItem('astrosubam_lang') || 'ta';
+
+        function setLanguage(lang) {
+            if (!astroTranslations[lang]) lang = 'ta';
+            currentLang = lang;
+            localStorage.setItem('astrosubam_lang', lang);
+
+            // Sync all select elements
+            const selectors = document.querySelectorAll('.lang-selector');
+            selectors.forEach(sel => { sel.value = lang; });
+
+            // Update all elements with data-i18n attribute
+            const elements = document.querySelectorAll('[data-i18n]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (astroTranslations[lang] && astroTranslations[lang][key]) {
+                    el.innerHTML = astroTranslations[lang][key];
+                }
+            });
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Initialize language on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setLanguage(currentLang);
+        });
+
         // Real-Time Astrologer Status Map & Poller
         let astroRealtimeStatus = {};
+        let astroVideoStatus = {};
 
         async function pollAstrologersLiveStatus() {
             try {
@@ -1150,10 +1321,13 @@ try {
                         const id = a.id;
                         const status = (a.call_status || 'offline').toLowerCase();
                         astroRealtimeStatus[id] = status;
+                        const isVid = a.is_video_enabled !== false && a.is_video_enabled != 0;
+                        astroVideoStatus[id] = isVid;
 
                         const dot = document.getElementById(`astro-dot-${id}`);
                         const pill = document.getElementById(`astro-pill-${id}`);
                         const card = document.getElementById(`astro-card-${id}`);
+                        const vidBtn = document.getElementById(`astro-btn-video-${id}`);
 
                         if (dot) {
                             dot.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-astro-card ` +
@@ -1162,7 +1336,9 @@ try {
                         if (pill) {
                             pill.className = `text-[10px] font-bold px-2 py-0.5 rounded-full ` +
                                 (status === 'available' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (status === 'busy' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'));
-                            pill.innerHTML = `● ` + (status === 'available' ? 'நேரலை (Online)' : (status === 'busy' ? 'ஆலோசனையில்' : 'ஆஃப்லைன் (Offline)'));
+                            pill.innerHTML = status === 'available' 
+                                ? (astroTranslations[currentLang]?.online_status || '● நேரலை (Online)') 
+                                : (status === 'busy' ? (astroTranslations[currentLang]?.busy_status || '● ஆலோசனையில்') : (astroTranslations[currentLang]?.offline_status || '● ஆஃப்லைன் (Offline)'));
                         }
                         if (card) {
                             if (status === 'available') {
@@ -1171,7 +1347,24 @@ try {
                                 card.classList.add('opacity-80');
                             }
                         }
+
+                        if (vidBtn) {
+                            if (!isVid) {
+                                vidBtn.disabled = true;
+                                vidBtn.title = "இந்த ஜோதிடருக்கு வீடியோ ஆலோசனை வசதி தற்போது முடக்கப்பட்டுள்ளது";
+                                vidBtn.className = "py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 bg-gray-800/80 border border-gray-700/60 opacity-50 cursor-not-allowed text-gray-400";
+                                vidBtn.onclick = null;
+                                vidBtn.innerHTML = `<i data-lucide="video-off" class="w-3.5 h-3.5 text-gray-500"></i><span data-i18n="video_na">${astroTranslations[currentLang]?.video_na || 'வீடியோ N/A'}</span><span class="text-[9px] text-gray-500 font-medium" data-i18n="disabled">${astroTranslations[currentLang]?.disabled || 'முடக்கப்பட்டது'}</span>`;
+                            } else {
+                                vidBtn.disabled = false;
+                                vidBtn.title = "";
+                                vidBtn.className = "btn-emerald py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5";
+                                vidBtn.onclick = () => startConsultation(id, 'Video', parseInt(a.video_rate_min || 30), a.name || 'Guruji');
+                                vidBtn.innerHTML = `<i data-lucide="video" class="w-3.5 h-3.5 text-astro-gold"></i><span data-i18n="video">${astroTranslations[currentLang]?.video || 'வீடியோ'}</span><span class="text-[10px] text-astro-gold font-semibold">₹${parseInt(a.video_rate_min || 30)}/<span data-i18n="per_min">${astroTranslations[currentLang]?.per_min || 'நிமி'}</span></span>`;
+                            }
+                        }
                     });
+                    if (window.lucide) lucide.createIcons();
                 }
             } catch (e) {}
         }
@@ -1189,6 +1382,10 @@ try {
             }
             if (curAstroStatus === 'busy') {
                 alert(`⚠️ ஜோதிடர் ${name} தற்போது மற்றொரு ஆலோசனையில் உள்ளார் (Busy).\nதயவுசெய்து சில நிமிடங்கள் கழித்து முயற்சிக்கவும்.`);
+                return;
+            }
+            if ((type || '').toLowerCase() === 'video' && astroVideoStatus[astroId] === false) {
+                alert(`⚠️ ஜோதிடர் ${name} அவர்களுக்கு வீடியோ ஆலோசனை வசதி தற்போது நிர்வாகத்தால் வழங்கப்படவில்லை.\nதயவுசெய்து ஆடியோ அழைப்பு அல்லது சாட் ஆலோசனையை தேர்ந்தெடுக்கவும்.`);
                 return;
             }
 
