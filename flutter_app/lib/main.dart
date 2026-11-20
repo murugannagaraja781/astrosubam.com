@@ -282,26 +282,29 @@ class AstroLocale {
   static Widget _langTile(BuildContext context, String code, String label, bool isSelected) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+      child: Material(
         color: isSelected ? AstroTheme.jadeContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? AstroTheme.solarYellow : AstroTheme.borderSubtle,
-        ),
-      ),
-      child: ListTile(
-        title: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? AstroTheme.solarYellow : Colors.white,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isSelected ? AstroTheme.solarYellow : AstroTheme.borderSubtle,
           ),
         ),
-        trailing: isSelected ? const Icon(Icons.check_circle, color: AstroTheme.solarYellow) : null,
-        onTap: () {
-          setLang(code);
-          Navigator.pop(context);
-        },
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? AstroTheme.solarYellow : Colors.white,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          trailing: isSelected ? const Icon(Icons.check_circle, color: AstroTheme.solarYellow) : null,
+          onTap: () {
+            setLang(code);
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

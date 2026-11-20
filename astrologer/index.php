@@ -472,8 +472,8 @@ if ($currentAstro) {
                                 <p class="text-pine dark:text-gold">₹<?= (int)$currentAstro['audio_rate_min'] ?>/m</p>
                             </div>
                             <div class="bg-gray-50 dark:bg-white/5 p-1 rounded-lg">
-                                <p class="text-[9px] text-gray-400">VIDEO</p>
-                                <p class="text-pine dark:text-gold">₹<?= (int)$currentAstro['video_rate_min'] ?>/m</p>
+                                <p class="text-[9px] text-gray-400">VIDEO <?= ((int)($currentAstro['is_video_enabled'] ?? 1) === 1) ? '✔' : '🚫' ?></p>
+                                <p class="text-pine dark:text-gold"><?= ((int)($currentAstro['is_video_enabled'] ?? 1) === 1) ? '₹' . (int)$currentAstro['video_rate_min'] . '/m' : '<span class="text-red-500 font-bold text-[10px]">Off by Admin</span>' ?></p>
                             </div>
                             <div class="bg-gray-50 dark:bg-white/5 p-1 rounded-lg">
                                 <p class="text-[9px] text-gray-400">CHAT</p>
@@ -1020,7 +1020,12 @@ if ($currentAstro) {
                         <input type="number" step="1" name="audio_rate" value="<?= (int)$currentAstro['audio_rate_min'] ?>" required class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-bold">
                     </div>
                     <div>
-                        <label class="block text-gray-600 dark:text-gray-300 mb-1">📹 Video Call Rate (₹/min)</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-gray-600 dark:text-gray-300">📹 Video Call Rate (₹/min)</label>
+                            <?php if ((int)($currentAstro['is_video_enabled'] ?? 1) === 0): ?>
+                                <span class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded">🚫 Super Admin Turned Off</span>
+                            <?php endif; ?>
+                        </div>
                         <input type="number" step="1" name="video_rate" value="<?= (int)$currentAstro['video_rate_min'] ?>" required class="w-full p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-bold">
                     </div>
                     <div>

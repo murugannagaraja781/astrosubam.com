@@ -17,6 +17,7 @@ $experienceYears = max(1, (int)($input['experience_years'] ?? $input['experience
 $audioRate = max(5.0, (float)($input['audio_rate_min'] ?? $input['audio_rate'] ?? 20.0));
 $videoRate = max(10.0, (float)($input['video_rate_min'] ?? $input['video_rate'] ?? 35.0));
 $chatRate = max(5.0, (float)($input['chat_rate_min'] ?? $input['chat_rate'] ?? 12.0));
+$isVideoEnabled = isset($input['is_video_enabled']) ? ((int)$input['is_video_enabled'] === 1 || $input['is_video_enabled'] === true || $input['is_video_enabled'] === '1' ? 1 : 0) : 1;
 $avatar = trim((string)($input['avatar'] ?? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80'));
 
 if (empty($name)) {
@@ -40,8 +41,8 @@ $passwordHash = password_hash($password, PASSWORD_BCRYPT);
 
 try {
     $ins = $db->prepare("INSERT INTO astrologers 
-        (name, phone, email, password_hash, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, call_status, rating, total_reviews)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 5.00, 1)");
+        (name, phone, email, password_hash, avatar, languages, specialities, experience_years, audio_rate_min, video_rate_min, chat_rate_min, call_status, rating, total_reviews, is_video_enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 5.00, 1, ?)");
     
     $ins->execute([
         $name,
@@ -54,7 +55,8 @@ try {
         $experienceYears,
         $audioRate,
         $videoRate,
-        $chatRate
+        $chatRate,
+        $isVideoEnabled
     ]);
     
     $astroId = (int)$db->lastInsertId();
@@ -71,6 +73,7 @@ try {
             'audio_rate_min' => $audioRate,
             'video_rate_min' => $videoRate,
             'chat_rate_min' => $chatRate,
+            'is_video_enabled' => (bool)($isVideoEnabled === 1),
             'status' => 'offline'
         ]
     ], 201);
